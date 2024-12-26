@@ -1,40 +1,45 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
-  Paper,
   Typography,
   Button,
+  Box,
+  Paper,
   Grid,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
   List,
   ListItem,
   ListItemText,
   ListItemAvatar,
   Avatar,
-  Box,
   Alert,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions
+  CloseIcon,
+  RefreshIcon,
+  PersonIcon,
+  AdminIcon
 } from '@mui/material';
 import {
   Edit as EditIcon,
+  Delete as DeleteIcon,
   Email as EmailIcon,
   Download as DownloadIcon,
   Close as CloseIcon,
   Refresh as RefreshIcon,
-  Delete as DeleteIcon,
   Person as PersonIcon,
   AdminPanelSettings as AdminIcon
 } from '@mui/icons-material';
-import { useParams, useNavigate } from 'react-router-dom';
 import { db, auth } from '../../services/firebase';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc, setDoc } from 'firebase/firestore';
 import { emailGameReport, GameReportDownloadLink } from '../../utils/pdfGenerator';
 import { checkAdminStatus } from '../../utils/adminUtils';
 import { distributeTeams } from '../../utils/playerDistribution';
 import { getPlayerData } from '../../utils/playerUtils';
+import { useAuth } from '../../contexts/AuthContext';
 import EditGame from './EditGame';
 import GameTimer from './GameTimer';
 
@@ -144,21 +149,15 @@ export default function GameDetails() {
     }
 
     try {
-      setError('');
-      const adminsSnapshot = await getDocs(
-        query(collection(db, 'users'), where('role', '==', 'admin'))
-      );
-      const adminEmails = adminsSnapshot.docs.map(doc => doc.data().email).filter(Boolean);
-      
-      if (adminEmails.length === 0) {
-        throw new Error('No admin emails found');
-      }
-
-      const teams = createTeams(game.players || []);
-      await emailGameReport({ ...game, teams }, adminEmails);
+      setLoading(true);
+      const gameRef = doc(db, 'games', id);
+      await emailGameReport(game, gameRef);
       setError('Email sent successfully!');
     } catch (err) {
+      console.error('Error sending email:', err);
       setError('Failed to send email: ' + err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -384,57 +383,33 @@ export default function GameDetails() {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Typography variant="h5">Game Details</Typography>
           {isAdmin && (
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Button 
-                variant="contained" 
-                onClick={() => setOpenEdit(true)} 
-                startIcon={<EditIcon />}
-              >
-                Edit
-              </Button>
-              <Button 
-                variant="contained" 
-                color="info" 
-                onClick={handleSendEmail} 
-                startIcon={<EmailIcon />}
-              >
-                Email Report
-              </Button>
-              <GameReportDownloadLink game={game}>
-                <Button 
-                  variant="contained" 
-                  color="secondary"
-                  startIcon={<DownloadIcon />}
+            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+              {game.isOpen && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<EditIcon />}
+                  onClick={() => setOpenEdit(true)}
                 >
-                  Download PDF
-                </Button>
-              </GameReportDownloadLink>
-              {game.status === 'open' ? (
-                <Button 
-                  variant="contained" 
-                  color="error" 
-                  onClick={handleCloseGame} 
-                  startIcon={<CloseIcon />}
-                >
-                  Close Game
-                </Button>
-              ) : (
-                <Button 
-                  variant="contained" 
-                  color="success" 
-                  onClick={handleReopenGame} 
-                  startIcon={<RefreshIcon />}
-                >
-                  Reopen Game
+                  Edit
                 </Button>
               )}
               <Button
-                variant="outlined"
+                variant="contained"
                 color="error"
-                onClick={() => setOpenDelete(true)}
                 startIcon={<DeleteIcon />}
+                onClick={() => setOpenDelete(true)}
               >
                 Delete
+              </Button>
+              <Button
+                variant="contained"
+                color="info"
+                startIcon={<EmailIcon />}
+                onClick={handleSendEmail}
+                disabled={loading}
+              >
+                Send Email Report
               </Button>
             </Box>
           )}

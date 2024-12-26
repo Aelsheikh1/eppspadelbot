@@ -170,14 +170,18 @@ export default function GameDetails() {
 
     try {
       setError('');
-      await updateDoc(doc(db, 'games', id), {
+      const gameRef = doc(db, 'games', id);
+      await updateDoc(gameRef, {
         status: 'closed',
+        registrationOpen: false,  // Explicitly close registration
         closedAt: new Date().toISOString()
       });
 
+      // Update local state to reflect changes
       setGame(prev => ({
         ...prev,
         status: 'closed',
+        registrationOpen: false,
         closedAt: new Date().toISOString()
       }));
 
@@ -190,6 +194,7 @@ export default function GameDetails() {
         setError('Game closed but failed to send notifications');
       }
     } catch (err) {
+      console.error('Error closing game:', err);
       setError('Failed to close game: ' + err.message);
     }
   };

@@ -27,16 +27,24 @@ export const toggleGameStatus = async (gameId) => {
     }
 
     const gameData = gameSnap.data();
-    const newStatus = !gameData.isOpen;
+    const isCurrentlyClosed = gameData.status === 'closed';
+    const newStatus = isCurrentlyClosed ? 'open' : 'closed';
     
     await updateDoc(gameRef, {
-      isOpen: newStatus,
+      status: newStatus,
+      isOpen: isCurrentlyClosed,
+      registrationOpen: isCurrentlyClosed,
       lastUpdated: new Date().toISOString(),
-      ...(newStatus && { reopenCount: (gameData.reopenCount || 0) + 1 })
+      ...(isCurrentlyClosed ? { 
+        closedAt: null,
+        reopenCount: (gameData.reopenCount || 0) + 1 
+      } : { 
+        closedAt: new Date().toISOString() 
+      })
     });
 
     // If game is being closed, send email to admins
-    if (!newStatus) {  // game is being closed
+    if (!isCurrentlyClosed) {  // game is being closed
       try {
         await emailGameReport(gameId);
       } catch (emailError) {
@@ -45,7 +53,7 @@ export const toggleGameStatus = async (gameId) => {
       }
     }
 
-    return { success: true, isOpen: newStatus };
+    return { success: true, isOpen: isCurrentlyClosed };
   } catch (error) {
     console.error('Error toggling game status:', error);
     throw error;
@@ -78,19 +86,31 @@ export const distributePlayersRandomly = async (gameId) => {
             const playerData = playerDoc.data();
             return {
               id: playerId,
-              name: playerData.name,
-              email: playerData.email
+              name: playerData.name || playerData.displayName || 'Unknown Player',
+              email: playerData.email || null
+            };
+          } else {
+            // If player document doesn't exist, create a default player object
+            return {
+              id: playerId,
+              name: 'Unknown Player',
+              email: null
             };
           }
         } catch (error) {
           console.error(`Error fetching player ${playerId}:`, error);
+          // Return a default player object instead of null
+          return {
+            id: playerId,
+            name: 'Unknown Player',
+            email: null
+          };
         }
-        return null;
       })
     );
 
     // Filter out any null values and ensure minimum players
-    const validPlayers = players.filter(p => p !== null);
+    const validPlayers = players.filter(p => p !== null && p.id);
     if (validPlayers.length < 2) {
       throw new Error('Need at least 2 valid players to distribute');
     }
@@ -105,11 +125,24 @@ export const distributePlayersRandomly = async (gameId) => {
     // Create balanced pairs
     const pairs = [];
     for (let i = 0; i < shuffled.length; i += 2) {
-      pairs.push({
-        player1: shuffled[i],
-        player2: i + 1 < shuffled.length ? shuffled[i + 1] : null,
+      const player1 = shuffled[i];
+      const player2 = i + 1 < shuffled.length ? shuffled[i + 1] : null;
+      
+      // Ensure both players have valid data structure
+      const pair = {
+        player1: {
+          id: player1.id,
+          name: player1.name || 'Unknown Player',
+          email: player1.email || null
+        },
+        player2: player2 ? {
+          id: player2.id,
+          name: player2.name || 'Unknown Player',
+          email: player2.email || null
+        } : null,
         score: 0
-      });
+      };
+      pairs.push(pair);
     }
 
     // Update game with pairs
@@ -119,6 +152,7 @@ export const distributePlayersRandomly = async (gameId) => {
       distributionComplete: true
     };
 
+    console.log('Updating game with data:', JSON.stringify(updateData, null, 2));
     await updateDoc(gameRef, updateData);
 
     // Send email with distribution

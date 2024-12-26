@@ -39,6 +39,11 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingUser, setEditingUser] = useState(null);
+  const [editForm, setEditForm] = useState({
+    role: '',
+    firstName: '',
+    lastName: ''
+  });
   const [selectedRole, setSelectedRole] = useState('');
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [newUser, setNewUser] = useState({
@@ -63,16 +68,32 @@ export default function UserManagement() {
 
   const handleEditClick = (user) => {
     setEditingUser(user);
-    setSelectedRole(user.role || 'user');
+    setEditForm({
+      role: user.role || 'user',
+      firstName: user.firstName || '',
+      lastName: user.lastName || ''
+    });
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
   };
 
   const handleRoleChange = async () => {
     try {
-      await updateUserRole(editingUser.id, selectedRole);
+      await updateUserRole(editingUser.id, {
+        role: editForm.role,
+        firstName: editForm.firstName.trim(),
+        lastName: editForm.lastName.trim()
+      });
       setEditingUser(null);
       await fetchUsers();
     } catch (err) {
-      setError('Failed to update user role: ' + err.message);
+      setError('Failed to update user: ' + err.message);
     }
   };
 
@@ -176,16 +197,36 @@ export default function UserManagement() {
       </Paper>
 
       {/* Edit User Dialog */}
-      <Dialog open={Boolean(editingUser)} onClose={() => setEditingUser(null)}>
-        <DialogTitle>Edit User Role</DialogTitle>
+      <Dialog 
+        open={Boolean(editingUser)} 
+        onClose={() => setEditingUser(null)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Edit User</DialogTitle>
         <DialogContent>
-          <Box sx={{ minWidth: 300, mt: 2 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+            <TextField
+              label="First Name"
+              name="firstName"
+              value={editForm.firstName}
+              onChange={handleEditFormChange}
+              fullWidth
+            />
+            <TextField
+              label="Last Name"
+              name="lastName"
+              value={editForm.lastName}
+              onChange={handleEditFormChange}
+              fullWidth
+            />
             <FormControl fullWidth>
               <InputLabel>Role</InputLabel>
               <Select
-                value={selectedRole}
+                name="role"
+                value={editForm.role}
                 label="Role"
-                onChange={(e) => setSelectedRole(e.target.value)}
+                onChange={handleEditFormChange}
               >
                 <MenuItem value="user">User</MenuItem>
                 <MenuItem value="admin">Admin</MenuItem>
@@ -195,7 +236,11 @@ export default function UserManagement() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setEditingUser(null)}>Cancel</Button>
-          <Button onClick={handleRoleChange} variant="contained">
+          <Button 
+            onClick={handleRoleChange} 
+            variant="contained"
+            disabled={!editForm.role}
+          >
             Save Changes
           </Button>
         </DialogActions>

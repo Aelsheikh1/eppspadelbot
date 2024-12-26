@@ -50,12 +50,13 @@ import {
   getDoc,
   serverTimestamp
 } from 'firebase/firestore';
-import { format, formatDistanceToNow, parseISO, startOfDay, isAfter, differenceInHours, differenceInMinutes, differenceInDays, differenceInSeconds } from 'date-fns';
+import { format, formatDistanceToNow, parseISO, startOfDay, isAfter, differenceInHours, differenceInMinutes, differenceInDays, differenceInSeconds, differenceInMilliseconds } from 'date-fns';
 import { db, joinGame, leaveGame } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import EditGame from './EditGame';
 import { getPlayersData, clearPlayerCache } from '../../utils/playerUtils';
+import { emailGameReport } from '../../utils/pdfGenerator';
 
 const TimeUnit = ({ value, unit, color }) => (
   <Box 
@@ -96,108 +97,77 @@ const TimeUnit = ({ value, unit, color }) => (
   </Box>
 );
 
-const CountdownTimer = ({ deadline, deadlineTime }) => {
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
-  const [isClosed, setIsClosed] = useState(false);
+const CountdownTimer = ({ deadline, deadlineTime, gameId }) => {
+  const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
+  const [hasExpired, setHasExpired] = useState(false);
 
   useEffect(() => {
-    const calculateTimeLeft = () => {
-      try {
-        const deadlineDate = parseISO(`${deadline}T${deadlineTime}`);
-        const now = new Date();
-        
-        if (isAfter(now, deadlineDate)) {
-          setIsClosed(true);
-          return null;
-        }
-
-        const days = differenceInDays(deadlineDate, now);
-        const hours = differenceInHours(deadlineDate, now) % 24;
-        const minutes = differenceInMinutes(deadlineDate, now) % 60;
-        const seconds = differenceInSeconds(deadlineDate, now) % 60;
-
-        return { days, hours, minutes, seconds };
-      } catch (error) {
-        console.error('Error calculating time left:', error);
-        return null;
-      }
-    };
-
-    // Initial calculation
-    const initialTime = calculateTimeLeft();
-    if (initialTime) {
-      setTimeLeft(initialTime);
-    }
-
-    // Update every second
     const timer = setInterval(() => {
-      const time = calculateTimeLeft();
-      if (time) {
-        setTimeLeft(time);
+      const newTimeLeft = calculateTimeLeft();
+      setTimeLeft(newTimeLeft);
+
+      // Check if timer just expired
+      const isExpired = Object.values(newTimeLeft).every(value => value <= 0);
+      if (isExpired && !hasExpired) {
+        setHasExpired(true);
+        handleGameExpired(gameId);
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [deadline, deadlineTime]);
+  }, [deadline, deadlineTime, gameId, hasExpired]);
 
-  // Color schemes for different time ranges
-  const getTimeColors = (timeLeft) => {
-    if (timeLeft.days > 0) {
-      return { bg: '#e3f2fd', text: '#1976d2' }; // Blue for days
-    } else if (timeLeft.hours > 2) {
-      return { bg: '#e8f5e9', text: '#2e7d32' }; // Green for hours
-    } else if (timeLeft.hours > 0) {
-      return { bg: '#fff3e0', text: '#ef6c00' }; // Orange for last hours
-    } else if (timeLeft.minutes > 30) {
-      return { bg: '#fff8e1', text: '#ff8f00' }; // Amber for minutes
-    } else {
-      return { bg: '#fce4ec', text: '#d81b60' }; // Pink for urgent
+  function calculateTimeLeft() {
+    try {
+      const deadlineDate = parseISO(`${deadline}T${deadlineTime}`);
+      const now = new Date();
+      const difference = differenceInMilliseconds(deadlineDate, now);
+
+      if (difference <= 0) {
+        return {
+          days: 0,
+          hours: 0,
+          minutes: 0,
+          seconds: 0
+        };
+      }
+
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60)
+      };
+    } catch (error) {
+      console.error('Error calculating time left:', error);
+      return {
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0
+      };
     }
-  };
-
-  if (isClosed) {
-    return (
-      <Box sx={{ display: 'flex', alignItems: 'center' }}>
-        <AccessTime sx={{ mr: 1, fontSize: 20, color: 'error.main' }} />
-        <Typography 
-          variant="body2" 
-          color="error.main"
-          sx={{ 
-            fontWeight: 'medium',
-            bgcolor: '#ffebee',
-            px: 1,
-            py: 0.5,
-            borderRadius: 1
-          }}
-        >
-          Registration is closed
-        </Typography>
-      </Box>
-    );
   }
 
-  const timeColors = getTimeColors(timeLeft);
+  const timeColors = Object.values(timeLeft).every(value => value <= 0)
+    ? 'error.main'
+    : timeLeft.hours <= 1
+    ? 'warning.main'
+    : 'text.secondary';
+
+  if (Object.values(timeLeft).every(value => value <= 0)) {
+    return null;
+  }
 
   return (
-    <Box sx={{ width: '100%' }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
-        <AccessTime sx={{ mr: 1, fontSize: 20, color: timeColors.text }} />
-        <Typography variant="body2" color={timeColors.text}>
-          Registration closes in:
-        </Typography>
-      </Box>
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'center',
-          p: 1,
-          bgcolor: 'background.paper',
-          borderRadius: 1,
-          boxShadow: 1,
-          animation: 'fadeIn 0.5s ease-in',
-          '@keyframes fadeIn': {
-            '0%': { opacity: 0 },
-            '100%': { opacity: 1 }
+    <Box>
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 0.5,
+          '& > *': {
+            minWidth: 'auto'
           }
         }}
       >
@@ -210,6 +180,24 @@ const CountdownTimer = ({ deadline, deadlineTime }) => {
       </Box>
     </Box>
   );
+};
+
+const handleGameExpired = async (gameId) => {
+  try {
+    const gameRef = doc(db, 'games', gameId);
+    await updateDoc(gameRef, {
+      status: 'closed',
+      isOpen: false,
+      registrationOpen: false,
+      closedAt: new Date().toISOString(),
+      closedByTimer: true
+    });
+
+    // Send game report email
+    await emailGameReport(gameId);
+  } catch (error) {
+    console.error('Error closing expired game:', error);
+  }
 };
 
 export default function GameList() {
@@ -336,9 +324,13 @@ export default function GameList() {
   const handleToggleGameStatus = async () => {
     if (selectedGame) {
       try {
-        const newStatus = selectedGame.status === 'closed' ? 'open' : 'closed';
+        const isCurrentlyClosed = selectedGame.status === 'closed';
+        const newStatus = isCurrentlyClosed ? 'open' : 'closed';
         await updateDoc(doc(db, 'games', selectedGame.id), {
-          status: newStatus
+          status: newStatus,
+          isOpen: isCurrentlyClosed,
+          registrationOpen: isCurrentlyClosed,
+          ...(isCurrentlyClosed ? { closedAt: null } : { closedAt: new Date().toISOString() })
         });
         setError('');
       } catch (err) {
@@ -348,49 +340,18 @@ export default function GameList() {
     handleMenuClose();
   };
 
-  const handleGameExpired = async (gameId) => {
-    try {
-      const gameRef = doc(db, 'games', gameId);
-      const gameDoc = await getDoc(gameRef);
-      
-      if (gameDoc.exists() && gameDoc.data().status !== 'closed') {
-        await updateDoc(gameRef, {
-          status: 'closed',
-          closedAt: serverTimestamp()
-        });
-
-        // Send email to participants
-        const gameData = gameDoc.data();
-        if (gameData.players && gameData.players.length > 0) {
-          const playerEmails = [];
-          for (const playerId of gameData.players) {
-            try {
-              const userDoc = await getDoc(doc(db, 'users', playerId));
-              if (userDoc.exists() && userDoc.data().email) {
-                playerEmails.push(userDoc.data().email);
-              }
-            } catch (error) {
-              console.error(`Error fetching email for player ${playerId}:`, error);
-            }
-          }
-
-          if (playerEmails.length > 0) {
-            // Here you would call your email sending function
-            // For now, just log it
-            console.log('Would send email to:', playerEmails);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error handling game expiration:', error);
-    }
-  };
-
   const getGameStatus = (game) => {
-    if (game.status === 'closed') {
+    if (game.status === 'closed' || !game.isOpen) {
       return { 
         label: 'Closed', 
         color: 'error',
+        icon: <LockIcon fontSize="small" />
+      };
+    }
+    if (isRegistrationClosed(game)) {
+      return {
+        label: 'Registration Closed',
+        color: 'warning',
         icon: <LockIcon fontSize="small" />
       };
     }
@@ -406,6 +367,22 @@ export default function GameList() {
       color: 'success',
       icon: <LockOpenIcon fontSize="small" />
     };
+  };
+
+  const isRegistrationClosed = (game) => {
+    try {
+      // If game is explicitly closed or not open, registration is closed
+      if (game.status === 'closed' || !game.isOpen || game.registrationOpen === false) {
+        return true;
+      }
+
+      // Check deadline
+      const deadlineDate = parseISO(`${game.deadline}T${game.deadlineTime}`);
+      return isAfter(new Date(), deadlineDate);
+    } catch (error) {
+      console.error('Error checking registration status:', error);
+      return true; // If there's an error, assume registration is closed
+    }
   };
 
   const isUserInGame = (game) => {
@@ -458,9 +435,14 @@ export default function GameList() {
     return colors[index % colors.length];
   };
 
-  const formatDeadline = (date, time) => {
+  const formatDeadline = (game) => {
     try {
-      const deadlineDate = parseISO(`${date}T${time}`);
+      // If game is closed, don't show registration time message
+      if (game.status === 'closed' || !game.isOpen) {
+        return '';
+      }
+
+      const deadlineDate = parseISO(`${game.deadline}T${game.deadlineTime}`);
       const now = new Date();
       
       if (isAfter(now, deadlineDate)) {
@@ -484,17 +466,7 @@ export default function GameList() {
       }
     } catch (error) {
       console.error('Error formatting deadline:', error);
-      return 'Invalid date';
-    }
-  };
-
-  const isRegistrationClosed = (game) => {
-    try {
-      const deadlineDate = parseISO(`${game.deadline}T${game.deadlineTime}`);
-      return isAfter(new Date(), deadlineDate);
-    } catch (error) {
-      console.error('Error checking registration status:', error);
-      return true; // If there's an error, assume registration is closed
+      return '';
     }
   };
 
@@ -556,7 +528,20 @@ export default function GameList() {
                       Padel Game
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <CountdownTimer deadline={game.deadline} deadlineTime={game.deadlineTime} />
+                      {(game.status === 'closed' || !game.isOpen) ? (
+                        <Chip
+                          label="Closed"
+                          color="error"
+                          size="small"
+                          icon={<LockIcon />}
+                          sx={{ 
+                            fontWeight: 'medium',
+                            '& .MuiChip-icon': { fontSize: 16 }
+                          }}
+                        />
+                      ) : (
+                        <CountdownTimer deadline={game.deadline} deadlineTime={game.deadlineTime} gameId={game.id} />
+                      )}
                     </Box>
                     {isAdmin && (
                       <IconButton
@@ -592,7 +577,7 @@ export default function GameList() {
                         variant="body2" 
                         color={isRegistrationClosed(game) ? 'error.main' : 'text.secondary'}
                       >
-                        {formatDeadline(game.deadline, game.deadlineTime)}
+                        {formatDeadline(game)}
                       </Typography>
                     </Box>
                     <Box 

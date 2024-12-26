@@ -223,23 +223,65 @@ export default function GameDetails() {
 
   const handleDistributeTeams = async () => {
     try {
+      console.log('Starting team distribution. Game data:', JSON.stringify(game, null, 2));
+      
       if (!game.players || game.players.length < 2) {
+        console.warn('Not enough players:', game.players);
         setError('Need at least 2 players to distribute teams');
         return;
       }
 
-      const teams = distributeTeams(game.players);
+      // Ensure each player has an id
+      const validPlayers = game.players.map(player => {
+        console.log('Processing player:', player);
+        if (typeof player === 'string') {
+          console.log('Player is string ID:', player);
+          return player;
+        }
+        if (!player || !player.id) {
+          console.warn('Invalid player object:', player);
+          return null;
+        }
+        const processedPlayer = {
+          id: player.id,
+          ...player
+        };
+        console.log('Processed player:', processedPlayer);
+        return processedPlayer;
+      }).filter(Boolean);
+
+      console.log('Valid players before distribution:', JSON.stringify(validPlayers, null, 2));
+
+      if (validPlayers.length < 2) {
+        console.warn('Not enough valid players after filtering:', validPlayers);
+        setError('Need at least 2 valid players to distribute teams');
+        return;
+      }
+
+      const teams = distributeTeams(validPlayers);
+      console.log('Teams after distribution:', JSON.stringify(teams, null, 2));
+      
       setDistributedTeams(teams);
 
       // Update the game document with the distributed teams
-      await updateDoc(doc(db, 'games', id), {
-        pairs: teams
-      });
+      const updateData = {
+        pairs: teams,
+        lastDistributed: new Date().toISOString()
+      };
+      console.log('Updating game document with data:', JSON.stringify(updateData, null, 2));
 
-      setGame(prev => ({
-        ...prev,
-        pairs: teams
-      }));
+      const gameRef = doc(db, 'games', id);
+      await updateDoc(gameRef, updateData);
+
+      setGame(prev => {
+        const updated = {
+          ...prev,
+          pairs: teams,
+          lastDistributed: new Date().toISOString()
+        };
+        console.log('Updated game state:', JSON.stringify(updated, null, 2));
+        return updated;
+      });
 
       setError('Teams distributed successfully!');
     } catch (err) {

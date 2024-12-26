@@ -372,11 +372,18 @@ export const getAllUsers = async () => {
   }
 };
 
-export const updateUserRole = async (userId, newRole) => {
+export const updateUserRole = async (userId, userData) => {
   try {
-    await updateDoc(doc(db, 'users', userId), {
-      role: newRole
+    const userRef = doc(db, 'users', userId);
+    const { role, firstName, lastName } = userData;
+    
+    await updateDoc(userRef, {
+      role,
+      firstName: firstName || '',
+      lastName: lastName || '',
+      lastUpdated: new Date().toISOString()
     });
+
     return true;
   } catch (error) {
     console.error('Error updating user role:', error);

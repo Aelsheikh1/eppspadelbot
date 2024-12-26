@@ -15,17 +15,30 @@ const calculateSkillLevel = (player) => {
 
 // Main function to distribute players into balanced teams
 export const distributeTeams = (players) => {
-  if (!players || players.length < 2) {
+  // Validate input
+  if (!players || players.length === 0) {
+    console.warn('No players provided for team distribution');
+    return [];
+  }
+
+  // Filter out any undefined or null players
+  const validPlayers = players.filter(player => 
+    player && (typeof player === 'object' || typeof player === 'string')
+  );
+
+  // Ensure we have at least 2 players
+  if (validPlayers.length < 2) {
+    console.warn('Not enough players to create teams');
     return [];
   }
 
   // Sort players by skill level
-  const sortedPlayers = [...players].sort((a, b) => 
+  const sortedPlayers = [...validPlayers].sort((a, b) => 
     calculateSkillLevel(b) - calculateSkillLevel(a)
   );
 
   // Calculate number of pairs possible
-  const numPairs = Math.floor(players.length / 2);
+  const numPairs = Math.floor(validPlayers.length / 2);
   const pairs = [];
 
   // Create pairs ensuring skill balance
@@ -42,7 +55,7 @@ export const distributeTeams = (players) => {
   }
 
   // Handle remaining player if odd number
-  const remainingPlayer = players.length % 2 === 1 ? sortedPlayers[numPairs] : null;
+  const remainingPlayer = validPlayers.length % 2 === 1 ? sortedPlayers[numPairs] : null;
   if (remainingPlayer) {
     pairs.push({
       player1: remainingPlayer,

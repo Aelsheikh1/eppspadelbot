@@ -1,5 +1,5 @@
 import { db } from '../services/firebase';
-import { doc, getDoc, getDocs, query, where, collection } from 'firebase/firestore';
+import { doc, getDoc, getDocs, query, where, collection, updateDoc } from 'firebase/firestore';
 import { format } from 'date-fns';
 import emailjs from '@emailjs/browser';
 
@@ -12,11 +12,18 @@ export const emailGameReport = async (gameId) => {
     // Fetch game data
     const gameRef = doc(db, 'games', gameId);
     const gameDoc = await getDoc(gameRef);
+    
     if (!gameDoc.exists()) {
       throw new Error('Game not found');
     }
 
     const game = { id: gameId, ...gameDoc.data() };
+
+    // Check if email has already been sent
+    if (game.emailSent) {
+      console.log('Email already sent for this game');
+      return;
+    }
 
     // Fetch complete player details for all players
     const players = await Promise.all(
@@ -223,9 +230,15 @@ export const emailGameReport = async (gameId) => {
       throw new Error('Failed to send email');
     }
 
-    return true;
+    // After sending email, mark as sent
+    await updateDoc(gameRef, {
+      emailSent: true,
+      emailSentAt: new Date().toISOString()
+    });
+
+    console.log('Game report email sent successfully');
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending game report email:', error);
     throw error;
   }
 };

@@ -1,0 +1,50 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isCurrentUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidGameUpdate() {
+      let incomingData = request.resource.data;
+      let existingData = resource.data;
+      
+      // For player updates, ensure players array is properly modified
+      let playersChanged = incomingData.players != existingData.players;
+      if (playersChanged) {
+        // Check if it's a valid join (adding exactly one player)
+        let joining = incomingData.players.size() == existingData.players.size() + 1;
+        // Check if it's a valid leave (removing exactly one player)
+        let leaving = incomingData.players.size() == existingData.players.size() - 1;
+        return joining || leaving;
+      }
+      
+      // For other updates, must be admin or game creator
+      return isAdmin() || existingData.createdBy == request.auth.uid;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isCurrentUser(userId) || isAdmin();
+    }
+
+    // Games collection
+    match /games/{gameId} {
+      allow read: if isSignedIn();
+      allow create: if isAdmin();
+      allow update: if isValidGameUpdate();
+      allow delete: if isAdmin();
+    }
+  }
+}

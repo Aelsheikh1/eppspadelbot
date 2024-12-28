@@ -90,7 +90,6 @@ export const distributePlayersRandomly = async (gameId) => {
               email: playerData.email || null
             };
           } else {
-            // If player document doesn't exist, create a default player object
             return {
               id: playerId,
               name: 'Unknown Player',
@@ -111,19 +110,20 @@ export const distributePlayersRandomly = async (gameId) => {
       [validPlayers[i], validPlayers[j]] = [validPlayers[j], validPlayers[i]];
     }
 
-    // Create pairs
+    // Create pairs as objects instead of arrays
     const pairs = [];
     for (let i = 0; i < validPlayers.length; i += 2) {
-      const pair = [validPlayers[i].id];
-      if (i + 1 < validPlayers.length) {
-        pair.push(validPlayers[i + 1].id);
-      }
+      const pair = {
+        player1: validPlayers[i],
+        player2: i + 1 < validPlayers.length ? validPlayers[i + 1] : null,
+        score: 0
+      };
       pairs.push(pair);
     }
 
     // Update game with pairs
     await updateDoc(gameRef, {
-      pairs: pairs,
+      pairs,
       lastUpdated: new Date().toISOString(),
       distributedAt: new Date().toISOString()
     });

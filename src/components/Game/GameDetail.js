@@ -127,6 +127,13 @@ const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen
     return 'Unknown Player';
   };
 
+  const getPlayerColor = (playerId) => {
+    if (playerId === currentUser?.uid) return theme.palette.primary.main;
+    const playerData = playersData[playerId];
+    if (!playerData) return theme.palette.grey[300];
+    return playerData.color || getUserColor(playerId);
+  };
+
   const isPlayerInGame = players?.includes(currentUser?.uid);
 
   return (
@@ -171,14 +178,14 @@ const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen
                     Team {index + 1}
                   </Typography>
                   <List dense>
-                    {pair.map((playerId) => (
+                    {[pair.player1?.id, pair.player2?.id].filter(Boolean).map((playerId) => (
                       <ListItem key={playerId}>
                         <ListItemText 
                           primary={getPlayerName(playerId)}
                           sx={{
                             '& .MuiListItemText-primary': {
-                              color: playerId === currentUser?.uid ? 
-                                theme.palette.primary.main : 'inherit'
+                              color: getPlayerColor(playerId),
+                              fontWeight: playerId === currentUser?.uid ? 600 : 400
                             }
                           }}
                         />
@@ -198,8 +205,8 @@ const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen
                   primary={getPlayerName(playerId)}
                   sx={{
                     '& .MuiListItemText-primary': {
-                      color: playerId === currentUser?.uid ? 
-                        theme.palette.primary.main : 'inherit'
+                      color: getPlayerColor(playerId),
+                      fontWeight: playerId === currentUser?.uid ? 600 : 400
                     }
                   }}
                 />

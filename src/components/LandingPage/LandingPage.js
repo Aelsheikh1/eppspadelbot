@@ -112,8 +112,22 @@ export default function LandingPage() {
                 },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3, background: 'linear-gradient(45deg, #FFD700, #FFA500)', borderRadius: '50%', p: 2, boxShadow: '0 4px 20px rgba(0,0,0,0.15)' }}>
-                <TrophyIcon sx={{ fontSize: 80, color: 'white' }} />
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center', 
+                mb: 3, 
+                background: 'linear-gradient(45deg, #FFD700, #FFA500)', 
+                borderRadius: '50%', 
+                p: { xs: 3, sm: 3.5, md: 4 },  
+                boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                transform: 'scale(1.2)',  
+                margin: '20px auto'  
+              }}>
+                <TrophyIcon sx={{ 
+                  fontSize: { xs: 100, sm: 120, md: 140 },  
+                  color: 'white' 
+                }} />
               </Box>
 
               <>

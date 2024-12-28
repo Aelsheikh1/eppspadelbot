@@ -170,9 +170,11 @@ export default function GameDetails() {
     try {
       setError('');
       const gameRef = doc(db, 'games', id);
+      
+      // Just close the game
       await updateDoc(gameRef, {
         status: 'closed',
-        registrationOpen: false,  // Explicitly close registration
+        registrationOpen: false,
         closedAt: new Date().toISOString()
       });
 
@@ -184,7 +186,7 @@ export default function GameDetails() {
         closedAt: new Date().toISOString()
       }));
 
-      // Automatically send email when game is closed
+      // Send the email (teams will be distributed automatically)
       try {
         await emailGameReport(id);
         setError('Game closed and notification sent to all participants');

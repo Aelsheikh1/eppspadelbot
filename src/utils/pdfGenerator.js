@@ -7,6 +7,23 @@ const EMAILJS_SERVICE_ID = 'service_7tyowsa';
 const EMAILJS_TEMPLATE_ID = 'template_jbxo9ua';
 const EMAILJS_PUBLIC_KEY = 'nQmOlke0ZSm9wxLuH';
 
+// Function to distribute teams
+const distributeTeams = (players) => {
+  // Sort players by skill level
+  players.sort((a, b) => a.skillLevel - b.skillLevel);
+
+  // Distribute teams
+  const pairs = [];
+  for (let i = 0; i < players.length; i += 2) {
+    pairs.push({
+      player1: players[i],
+      player2: players[i + 1] || null
+    });
+  }
+
+  return pairs;
+};
+
 export const emailGameReport = async (gameId) => {
   try {
     // Fetch game data
@@ -19,7 +36,50 @@ export const emailGameReport = async (gameId) => {
 
     const game = { id: gameId, ...gameSnap.data() };
 
-    // Fetch complete player details for all players
+    // If game is closed and no teams are distributed yet, distribute them now
+    if (game.status === 'closed' && (!game.pairs || game.pairs.length === 0)) {
+      // Fetch complete player details for distribution
+      const players = await Promise.all(
+        (game.players || []).map(async (player) => {
+          const playerId = typeof player === 'string' ? player : player.id;
+          if (!playerId) return null;
+
+          try {
+            const playerDoc = await getDoc(doc(db, 'users', playerId));
+            if (playerDoc.exists()) {
+              const playerData = playerDoc.data();
+              return {
+                id: playerId,
+                name: playerData.firstName && playerData.lastName
+                  ? `${playerData.firstName} ${playerData.lastName}`
+                  : playerData.displayName || playerData.email?.split('@')[0] || 'Unknown Player',
+                email: playerData.email,
+                skillLevel: playerData.skillLevel || 5
+              };
+            }
+          } catch (error) {
+            console.error(`Error fetching player ${playerId}:`, error);
+          }
+          return null;
+        })
+      );
+
+      // Filter out null values
+      const validPlayers = players.filter(p => p !== null);
+      
+      // Distribute teams
+      const distributedPairs = distributeTeams(validPlayers);
+      
+      // Update game with distributed teams
+      await updateDoc(gameRef, {
+        pairs: distributedPairs
+      });
+      
+      // Update local game object with distributed pairs
+      game.pairs = distributedPairs;
+    }
+
+    // Fetch complete player details for email
     const players = await Promise.all(
       (game.players || []).map(async (player) => {
         const playerId = typeof player === 'string' ? player : player.id;

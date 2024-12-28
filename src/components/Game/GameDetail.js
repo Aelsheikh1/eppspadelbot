@@ -369,77 +369,118 @@ const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading, on
         onClose={() => setAddPlayerDialogOpen(false)}
         onAddPlayer={handleAddPlayer}
         loading={loading}
+        currentPlayers={game?.players || []}
       />
     </>
   );
 };
 
-const AddPlayerDialog = ({ open, onClose, onAddPlayer, loading }) => {
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [players, setPlayers] = useState([]);
+const AddPlayerDialog = ({ open, onClose, onAddPlayer, loading, currentPlayers }) => {
+  const [selectedPlayer, setSelectedPlayer] = useState('');
+  const [allPlayers, setAllPlayers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState('');
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
 
   useEffect(() => {
     const fetchPlayers = async () => {
+      setLoadingPlayers(true);
       try {
         const usersRef = collection(db, 'users');
-        const snapshot = await getDocs(usersRef);
-        const playersList = snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(user => user.role !== 'admin'); // Exclude admins from the list
-        setPlayers(playersList);
+        const usersSnap = await getDocs(usersRef);
+        const playersData = [];
+        
+        for (const doc of usersSnap.docs) {
+          const playerData = doc.data();
+          // Only add players who aren't already in the game
+          if (!currentPlayers?.includes(doc.id)) {
+            playersData.push({
+              id: doc.id,
+              name: playerData.firstName && playerData.lastName 
+                ? `${playerData.firstName} ${playerData.lastName}`
+                : playerData.displayName || playerData.email?.split('@')[0] || 'Unknown Player',
+              email: playerData.email
+            });
+          }
+        }
+        
+        setAllPlayers(playersData);
       } catch (error) {
         console.error('Error fetching players:', error);
-        setError('Failed to load players');
+      } finally {
+        setLoadingPlayers(false);
       }
     };
-    fetchPlayers();
-  }, []);
+
+    if (open) {
+      fetchPlayers();
+    }
+  }, [open, currentPlayers]);
+
+  const handleClose = () => {
+    setSelectedPlayer('');
+    setSearchQuery('');
+    onClose();
+  };
 
   const handleSubmit = async () => {
-    if (!selectedPlayer) {
-      setError('Please select a player');
-      return;
-    }
-    try {
-      await onAddPlayer(selectedPlayer.id);
-      onClose();
-    } catch (error) {
-      setError(error.message);
+    if (selectedPlayer) {
+      await onAddPlayer(selectedPlayer);
+      handleClose();
     }
   };
 
+  const filteredPlayers = allPlayers.filter(player => 
+    player.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    player.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <Dialog open={open} onClose={onClose}>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
       <DialogTitle>Add Player to Game</DialogTitle>
       <DialogContent>
-        <Box sx={{ mt: 2, minWidth: 300 }}>
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-          <Autocomplete
-            options={players}
-            getOptionLabel={(option) => 
-              `${option.firstName || ''} ${option.lastName || ''} ${option.email || ''}`
-            }
-            onChange={(event, newValue) => setSelectedPlayer(newValue)}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Select Player"
-                variant="outlined"
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            )}
-          />
-        </Box>
+        <TextField
+          autoFocus
+          margin="dense"
+          label="Search Players"
+          type="text"
+          fullWidth
+          variant="outlined"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          sx={{ mb: 2 }}
+        />
+        <List sx={{ width: '100%', bgcolor: 'background.paper' }}>
+          {loadingPlayers ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+              <CircularProgress />
+            </Box>
+          ) : filteredPlayers.length === 0 ? (
+            <Typography color="text.secondary" align="center" sx={{ p: 2 }}>
+              No players found
+            </Typography>
+          ) : (
+            filteredPlayers.map((player) => (
+              <ListItem
+                key={player.id}
+                button
+                selected={selectedPlayer === player.id}
+                onClick={() => setSelectedPlayer(player.id)}
+              >
+                <ListItemText
+                  primary={player.name}
+                  secondary={player.email}
+                />
+              </ListItem>
+            ))
+          )}
+        </List>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={handleClose}>Cancel</Button>
         <Button 
           onClick={handleSubmit} 
-          variant="contained" 
-          disabled={loading || !selectedPlayer}
-          startIcon={<PersonAddIcon />}
+          disabled={!selectedPlayer || loading}
+          variant="contained"
         >
           {loading ? <CircularProgress size={24} /> : 'Add Player'}
         </Button>
@@ -577,10 +618,29 @@ const GameDetail = () => {
   const handleEmail = async () => {
     setLoading(true);
     try {
-      await emailGameReport(id);
+      const response = await emailGameReport(id);
+      if (response.status === 200) {
+        toast.success('Game report sent successfully! 📧', {
+          style: {
+            background: '#1a73e8',
+            color: '#fff',
+            borderRadius: '8px',
+            padding: '16px',
+          },
+          icon: '✉️'
+        });
+      }
     } catch (error) {
       console.error('Error:', error);
-      setError(error.message || 'Failed to send email');
+      toast.error(error.message || 'Failed to send email', {
+        style: {
+          background: '#f44336',
+          color: '#fff',
+          borderRadius: '8px',
+          padding: '16px',
+        },
+        icon: '❌'
+      });
     } finally {
       setLoading(false);
     }

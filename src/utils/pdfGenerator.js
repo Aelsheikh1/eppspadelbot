@@ -11,19 +11,13 @@ export const emailGameReport = async (gameId) => {
   try {
     // Fetch game data
     const gameRef = doc(db, 'games', gameId);
-    const gameDoc = await getDoc(gameRef);
+    const gameSnap = await getDoc(gameRef);
     
-    if (!gameDoc.exists()) {
+    if (!gameSnap.exists()) {
       throw new Error('Game not found');
     }
 
-    const game = { id: gameId, ...gameDoc.data() };
-
-    // Check if email has already been sent
-    if (game.emailSent) {
-      console.log('Email already sent for this game');
-      return;
-    }
+    const game = { id: gameId, ...gameSnap.data() };
 
     // Fetch complete player details for all players
     const players = await Promise.all(
@@ -37,7 +31,9 @@ export const emailGameReport = async (gameId) => {
             const playerData = playerDoc.data();
             return {
               id: playerId,
-              name: playerData.name || playerData.email,
+              name: playerData.firstName && playerData.lastName
+                ? `${playerData.firstName} ${playerData.lastName}`
+                : playerData.displayName || playerData.email?.split('@')[0] || 'Unknown Player',
               email: playerData.email
             };
           }
@@ -53,17 +49,15 @@ export const emailGameReport = async (gameId) => {
 
     // If there are pairs, fetch player details for them too
     if (game.pairs) {
-      game.pairs = await Promise.all(
-        game.pairs.map(async (pair) => {
-          const player1 = pair.player1 ? game.players.find(p => p.id === (typeof pair.player1 === 'string' ? pair.player1 : pair.player1.id)) : null;
-          const player2 = pair.player2 ? game.players.find(p => p.id === (typeof pair.player2 === 'string' ? pair.player2 : pair.player2.id)) : null;
-          return {
-            ...pair,
-            player1,
-            player2
-          };
-        })
-      );
+      game.pairs = game.pairs.map(pair => {
+        const player1 = pair.player1 ? game.players.find(p => p.id === pair.player1.id) : null;
+        const player2 = pair.player2 ? game.players.find(p => p.id === pair.player2.id) : null;
+        return {
+          ...pair,
+          player1,
+          player2
+        };
+      });
     }
 
     // Get all admin emails
@@ -82,20 +76,9 @@ export const emailGameReport = async (gameId) => {
 
     const formatTeams = () => {
       if (!game.pairs || game.pairs.length === 0) {
-        // If no pairs but we have players, create a default team
-        if (game.players && game.players.length >= 2) {
-          return `<div style="padding: 12px; margin: 8px 0; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a73e8;">
-            <div style="color: #1a73e8; font-weight: bold; margin-bottom: 4px;">
-              <span style="background: #1a73e8; color: white; padding: 4px 8px; border-radius: 4px; font-size: 14px;">Team 1</span>
-            </div>
-            <div style="margin-top: 8px;">
-              <span style="color: #2196f3;">👤 ${game.players[0].name}</span> - 
-              <span style="color: #4caf50;">👤 ${game.players[1].name}</span>
-            </div>
-          </div>`;
-        }
         return '<p style="color: #666;">No teams distributed yet</p>';
       }
+
       return game.pairs.map((pair, index) => 
         `<div style="padding: 12px; margin: 8px 0; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #1a73e8;">
           <div style="color: #1a73e8; font-weight: bold; margin-bottom: 4px;">
@@ -104,28 +87,8 @@ export const emailGameReport = async (gameId) => {
             </span>
           </div>
           <div style="margin-top: 8px;">
-            <span style="color: #2196f3;">👤 ${pair.player1?.name || 'TBD'}</span> - 
-            <span style="color: #4caf50;">👤 ${pair.player2?.name || 'TBD'}</span>
-          </div>
-         </div>`
-      ).join('');
-    };
-
-    const formatPlayers = () => {
-      if (!game.players || game.players.length === 0) return '<p style="color: #666;">No players joined yet</p>';
-      
-      // Array of colors for players
-      const playerColors = ['#2196f3', '#4caf50', '#ff9800', '#e91e63', '#9c27b0', '#00bcd4', '#009688', '#ff5722'];
-      const playerIcons = ['👤', '🎾', '🏃', '🎯', '🌟', '⭐', '💫', '✨'];
-      
-      return game.players.map((player, index) => 
-        `<div style="padding: 12px; margin: 8px 0; background: #f8f9fa; border-radius: 8px; border-left: 4px solid ${playerColors[index % playerColors.length]};">
-          <div style="display: flex; align-items: center;">
-            <span style="font-size: 20px; margin-right: 8px;">${playerIcons[index % playerIcons.length]}</span>
-            <div>
-              <span style="color: ${playerColors[index % playerColors.length]}; font-weight: bold;">${player.name}</span>
-              <span style="color: #666; font-size: 0.9em;"> (${player.email})</span>
-            </div>
+            <span style="color: #2196f3;">👤 ${pair.player1?.name || 'TBD'}</span>
+            ${pair.player2 ? ` - <span style="color: #4caf50;">👤 ${pair.player2.name}</span>` : ''}
           </div>
          </div>`
       ).join('');
@@ -136,7 +99,7 @@ export const emailGameReport = async (gameId) => {
         <div style="background: #1a73e8; color: white; padding: 20px; border-radius: 8px 8px 0 0;">
           <h1 style="margin: 0; font-size: 24px;">
             <span style="margin-right: 10px;">🎾</span>
-            Game Report
+            Game Report ${game.emailSent ? '(Updated)' : ''}
           </h1>
         </div>
         
@@ -191,16 +154,8 @@ export const emailGameReport = async (gameId) => {
 
           <div style="margin-bottom: 20px;">
             <h2 style="color: #1a73e8; font-size: 18px;">
-              <span style="margin-right: 8px;">👥</span>
-              Players List
-            </h2>
-            ${formatPlayers()}
-          </div>
-
-          <div style="margin-bottom: 20px;">
-            <h2 style="color: #1a73e8; font-size: 18px;">
               <span style="margin-right: 8px;">🏆</span>
-              Distributed Teams
+              Teams Distribution
             </h2>
             ${formatTeams()}
           </div>
@@ -215,7 +170,7 @@ export const emailGameReport = async (gameId) => {
 
     const templateParams = {
       to_email: recipientEmails.join(','),
-      game_id: `${game.location} - ${format(new Date(game.date), 'PP')} at ${game.time}${game.reopenCount ? ' (Updated)' : ''}`,
+      game_id: `${game.location} - ${format(new Date(game.date), 'PP')} at ${game.time}${game.emailSent ? ' (Updated)' : ''}`,
       game_details: emailBody
     };
 
@@ -230,13 +185,14 @@ export const emailGameReport = async (gameId) => {
       throw new Error('Failed to send email');
     }
 
-    // After sending email, mark as sent
+    // Mark as sent and increment reopenCount if it's a resend
     await updateDoc(gameRef, {
       emailSent: true,
-      emailSentAt: new Date().toISOString()
+      emailSentAt: new Date().toISOString(),
+      reopenCount: (game.reopenCount || 0) + (game.emailSent ? 1 : 0)
     });
 
-    console.log('Game report email sent successfully');
+    return response;
   } catch (error) {
     console.error('Error sending game report email:', error);
     throw error;

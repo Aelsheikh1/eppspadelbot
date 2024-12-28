@@ -99,73 +99,69 @@ export const distributePlayersRandomly = async (gameId) => {
           }
         } catch (error) {
           console.error(`Error fetching player ${playerId}:`, error);
-          // Return a default player object instead of null
-          return {
-            id: playerId,
-            name: 'Unknown Player',
-            email: null
-          };
+          return null;
         }
       })
     );
 
-    // Filter out any null values and ensure minimum players
-    const validPlayers = players.filter(p => p !== null && p.id);
-    if (validPlayers.length < 2) {
-      throw new Error('Need at least 2 valid players to distribute');
-    }
-
-    // Shuffle players
-    const shuffled = [...validPlayers];
-    for (let i = shuffled.length - 1; i > 0; i--) {
+    // Filter out null values and shuffle players
+    const validPlayers = players.filter(player => player !== null);
+    for (let i = validPlayers.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      [validPlayers[i], validPlayers[j]] = [validPlayers[j], validPlayers[i]];
     }
 
-    // Create balanced pairs
+    // Create pairs
     const pairs = [];
-    for (let i = 0; i < shuffled.length; i += 2) {
-      const player1 = shuffled[i];
-      const player2 = i + 1 < shuffled.length ? shuffled[i + 1] : null;
-      
-      // Ensure both players have valid data structure
-      const pair = {
-        player1: {
-          id: player1.id,
-          name: player1.name || 'Unknown Player',
-          email: player1.email || null
-        },
-        player2: player2 ? {
-          id: player2.id,
-          name: player2.name || 'Unknown Player',
-          email: player2.email || null
-        } : null,
-        score: 0
-      };
+    for (let i = 0; i < validPlayers.length; i += 2) {
+      const pair = [validPlayers[i].id];
+      if (i + 1 < validPlayers.length) {
+        pair.push(validPlayers[i + 1].id);
+      }
       pairs.push(pair);
     }
 
     // Update game with pairs
-    const updateData = {
-      pairs,
-      lastDistributed: new Date().toISOString(),
-      distributionComplete: true
-    };
-
-    console.log('Updating game with data:', JSON.stringify(updateData, null, 2));
-    await updateDoc(gameRef, updateData);
-
-    // Send email with distribution
-    try {
-      await emailGameReport(gameId);
-    } catch (emailError) {
-      console.error('Error sending distribution email:', emailError);
-      // Don't throw here as distribution was successful
-    }
+    await updateDoc(gameRef, {
+      pairs: pairs,
+      lastUpdated: new Date().toISOString(),
+      distributedAt: new Date().toISOString()
+    });
 
     return pairs;
   } catch (error) {
     console.error('Error distributing players:', error);
+    throw error;
+  }
+};
+
+export const addPlayerToGame = async (gameId, playerId) => {
+  try {
+    const gameRef = doc(db, 'games', gameId);
+    const gameSnap = await getDoc(gameRef);
+    
+    if (!gameSnap.exists()) {
+      throw new Error('Game not found');
+    }
+
+    const gameData = gameSnap.data();
+    
+    // Check if player is already in the game
+    if (gameData.players && gameData.players.includes(playerId)) {
+      throw new Error('Player is already in this game');
+    }
+
+    // Add player to the game
+    const updatedPlayers = [...(gameData.players || []), playerId];
+    
+    await updateDoc(gameRef, {
+      players: updatedPlayers,
+      lastUpdated: new Date().toISOString()
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error adding player to game:', error);
     throw error;
   }
 };

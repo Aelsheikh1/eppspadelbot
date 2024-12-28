@@ -1,11 +1,48 @@
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebase';
 
 // Cache for player data to avoid repeated fetches
 const playerCache = new Map();
 
+// Add real-time listener for user changes
+const userListeners = new Map();
+
+const setupUserListener = (userId) => {
+  if (userListeners.has(userId)) return;
+
+  const userRef = doc(db, 'users', userId);
+  const unsubscribe = onSnapshot(userRef, (doc) => {
+    if (doc.exists()) {
+      // Clear cache for this user when their data changes
+      playerCache.delete(userId);
+      // Force a refresh of the data
+      getPlayerData(userId);
+    }
+  });
+
+  userListeners.set(userId, unsubscribe);
+};
+
+// Clear cache when needed (e.g., after profile updates)
+export const clearPlayerCache = (userId = null) => {
+  if (userId) {
+    playerCache.delete(userId);
+  } else {
+    playerCache.clear();
+  }
+};
+
+// Cleanup function to remove listeners
+export const cleanupUserListeners = () => {
+  userListeners.forEach((unsubscribe) => unsubscribe());
+  userListeners.clear();
+};
+
 export const getPlayerData = async (playerId, currentUserId = null) => {
   console.log('Fetching player data for:', playerId);
+  
+  // Setup real-time listener for this user
+  setupUserListener(playerId);
   
   // Check cache first
   if (playerCache.has(playerId)) {
@@ -97,10 +134,4 @@ export const getPlayersData = async (playerIds, currentUserId = null) => {
   const result = Object.fromEntries(playersData.map(data => [data.id, data]));
   console.log('Final players data:', result);
   return result;
-};
-
-// Clear cache when needed (e.g., after profile updates)
-export const clearPlayerCache = () => {
-  console.log('Clearing player cache');
-  playerCache.clear();
 };

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
-import { doc, getDoc, onSnapshot } from 'firebase/firestore';
+import { useParams, useNavigate } from 'react-router-dom';
+import { doc, getDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { db, joinGame, leaveGame } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { checkAdminStatus, distributePlayersRandomly, toggleGameStatus } from '../../utils/adminUtils';
+import { checkAdminStatus, distributePlayersRandomly, toggleGameStatus, addPlayerToGame } from '../../utils/adminUtils';
 import { emailGameReport } from '../../utils/pdfGenerator';
 import { getUserColor } from '../../utils/colorUtils';
+import { getPlayersData, cleanupUserListeners } from '../../utils/playerUtils';
 import {
   Box,
   Button,
@@ -24,13 +25,19 @@ import {
   ListItemText,
   Paper,
   Typography,
-  useTheme
+  useTheme,
+  TextField,
+  Alert,
+  Autocomplete
 } from '@mui/material';
 import {
   Email as EmailIcon,
-  Group as GroupIcon,
-  Lock as LockIcon,
+  PersonAdd as PersonAddIcon,
+  Groups as GroupsIcon,
   LockOpen as LockOpenIcon,
+  Lock as LockIcon,
+  Shuffle as ShuffleIcon,
+  Group as GroupIcon,
   Refresh as RefreshIcon,
   Person as PersonIcon,
   LocationOn as LocationIcon,
@@ -100,74 +107,42 @@ const GameHeader = ({ game, timeUntilGame }) => {
 };
 
 // Component for player list
-const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen }) => {
+const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen, playersData }) => {
   const theme = useTheme();
-  const [playerDetails, setPlayerDetails] = useState({});
-
-  // Fetch player details
-  useEffect(() => {
-    const fetchPlayerDetails = async () => {
-      const details = {};
-      for (const player of (players || [])) {
-        if (!player) continue;
-        
-        // Get the player ID whether it's a string or object
-        const playerId = typeof player === 'string' ? player : player.id;
-        if (!playerId) continue;
-
-        try {
-          const playerRef = doc(db, 'users', playerId);
-          const playerDoc = await getDoc(playerRef);
-          if (playerDoc.exists()) {
-            details[playerId] = {
-              id: playerId,
-              ...playerDoc.data()
-            };
-          }
-        } catch (error) {
-          console.error('Error fetching player details:', error);
-        }
-      }
-      setPlayerDetails(details);
-    };
-
-    if (players?.length > 0) {
-      fetchPlayerDetails();
-    }
-  }, [players]);
 
   const getPlayerName = (playerId) => {
-    if (!playerId) return 'Unknown Player';
-    const details = playerDetails[playerId];
-    return details?.name || details?.email || 'Loading...';
+    const playerData = playersData[playerId];
+    if (!playerData) return 'Loading...';
+
+    if (playerId === currentUser?.uid) return 'You';
+
+    if (playerData.firstName && playerData.lastName) {
+      return `${playerData.firstName} ${playerData.lastName}`;
+    } else if (playerData.displayName) {
+      return playerData.displayName;
+    } else if (playerData.email) {
+      return playerData.email.split('@')[0];
+    }
+    
+    return 'Unknown Player';
   };
 
-  const getPlayerEmail = (playerId) => {
-    if (!playerId) return '';
-    const details = playerDetails[playerId];
-    return details?.email && details.email !== getPlayerName(playerId) ? details.email : '';
-  };
-
-  // Get player ID whether it's a string or object
-  const getPlayerId = (player) => {
-    return typeof player === 'string' ? player : player?.id;
-  };
-
-  const isPlayerInGame = players?.some(player => getPlayerId(player) === currentUser?.uid);
+  const isPlayerInGame = players?.includes(currentUser?.uid);
 
   return (
-    <Card sx={{ mb: 3 }}>
+    <Card>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
           <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <GroupIcon /> Players ({players?.length || 0})
+            <GroupsIcon /> Players ({players?.length || 0})
           </Typography>
           <Button
             variant="contained"
-            color={isPlayerInGame ? "error" : "primary"}
+            color="primary"
             onClick={onJoinLeave}
             disabled={loading || !currentUser || !isOpen}
             size="small"
+            startIcon={isPlayerInGame ? <PersonIcon /> : <PersonAddIcon />}
           >
             {loading ? (
               <CircularProgress size={24} />
@@ -179,123 +154,58 @@ const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen
           </Button>
         </Box>
 
-        {/* All Players List */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle1" gutterBottom sx={{ color: theme.palette.text.secondary }}>
-            All Players
-          </Typography>
-          <List>
-            {players?.map((player, index) => {
-              const playerId = getPlayerId(player);
-              const playerColor = getUserColor(playerId || 'default');
-              return (
-                <ListItem
-                  key={playerId || index}
-                  divider={index !== (players?.length || 0) - 1}
+        {pairs ? (
+          // Teams view
+          <Grid container spacing={2}>
+            {pairs.map((pair, index) => (
+              <Grid item xs={12} key={index}>
+                <Paper 
+                  elevation={3}
                   sx={{
-                    backgroundColor: playerColor,
-                    borderRadius: 1,
-                    mb: 1,
-                    transition: 'all 0.2s ease-in-out',
-                    '&:hover': {
-                      transform: 'translateX(8px)',
-                      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                    }
+                    p: 2,
+                    backgroundColor: theme.palette.background.default,
+                    borderLeft: `4px solid ${theme.palette.primary.main}`
                   }}
                 >
-                  <ListItemText
-                    primary={
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <PersonIcon sx={{ color: theme.palette.common.black }} />
-                        <Typography variant="body1" sx={{ fontWeight: 500, color: theme.palette.common.black }}>
-                          {getPlayerName(playerId)}
-                          {playerId === currentUser?.uid && ' (You)'}
-                        </Typography>
-                      </Box>
+                  <Typography variant="subtitle1" gutterBottom>
+                    Team {index + 1}
+                  </Typography>
+                  <List dense>
+                    {pair.map((playerId) => (
+                      <ListItem key={playerId}>
+                        <ListItemText 
+                          primary={getPlayerName(playerId)}
+                          sx={{
+                            '& .MuiListItemText-primary': {
+                              color: playerId === currentUser?.uid ? 
+                                theme.palette.primary.main : 'inherit'
+                            }
+                          }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              </Grid>
+            ))}
+          </Grid>
+        ) : (
+          // Regular players list
+          <List dense>
+            {players?.map((playerId) => (
+              <ListItem key={playerId}>
+                <ListItemText 
+                  primary={getPlayerName(playerId)}
+                  sx={{
+                    '& .MuiListItemText-primary': {
+                      color: playerId === currentUser?.uid ? 
+                        theme.palette.primary.main : 'inherit'
                     }
-                    secondary={
-                      <Typography variant="body2" sx={{ color: 'rgba(0,0,0,0.7)' }}>
-                        {getPlayerEmail(playerId)}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              );
-            })}
+                  }}
+                />
+              </ListItem>
+            ))}
           </List>
-        </Box>
-
-        {/* Teams Distribution (if available) */}
-        {pairs && pairs.length > 0 && (
-          <Box>
-            <Typography variant="subtitle1" gutterBottom sx={{ color: theme.palette.text.secondary }}>
-              Distributed Teams
-            </Typography>
-            <List>
-              {pairs.map((pair, index) => {
-                const player1Id = getPlayerId(pair?.player1);
-                const player2Id = getPlayerId(pair?.player2);
-                const player1Color = getUserColor(player1Id || 'default');
-                const player2Color = getUserColor(player2Id || 'default');
-                
-                return (
-                  <ListItem
-                    key={index}
-                    sx={{
-                      bgcolor: theme.palette.background.paper,
-                      borderRadius: 1,
-                      mb: 1,
-                      border: `1px solid ${theme.palette.divider}`
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Typography 
-                            variant="caption"
-                            sx={{
-                              bgcolor: theme.palette.primary.main,
-                              color: 'white',
-                              px: 1,
-                              py: 0.5,
-                              borderRadius: 1,
-                              minWidth: 60,
-                              textAlign: 'center'
-                            }}
-                          >
-                            Team {index + 1}
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Typography sx={{ 
-                              backgroundColor: player1Color,
-                              padding: '4px 8px',
-                              borderRadius: '4px',
-                              color: theme.palette.common.black
-                            }}>
-                              {getPlayerName(player1Id)}
-                            </Typography>
-                            {player2Id && (
-                              <>
-                                <Typography>&</Typography>
-                                <Typography sx={{ 
-                                  backgroundColor: player2Color,
-                                  padding: '4px 8px',
-                                  borderRadius: '4px',
-                                  color: theme.palette.common.black
-                                }}>
-                                  {getPlayerName(player2Id)}
-                                </Typography>
-                              </>
-                            )}
-                          </Box>
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                );
-              })}
-            </List>
-          </Box>
         )}
       </CardContent>
     </Card>
@@ -303,8 +213,9 @@ const PlayersList = ({ players, pairs, currentUser, onJoinLeave, loading, isOpen
 };
 
 // Component for admin actions
-const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading }) => {
+const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading, onAddPlayer }) => {
   const [confirmDialog, setConfirmDialog] = useState({ open: false, action: null });
+  const [addPlayerDialogOpen, setAddPlayerDialogOpen] = useState(false);
 
   const handleAction = async () => {
     try {
@@ -344,39 +255,74 @@ const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading }) 
     }
   };
 
+  const handleAddPlayer = async (playerId) => {
+    try {
+      await onAddPlayer(playerId);
+    } catch (error) {
+      console.error('Error:', error);
+    }
+  };
+
   return (
     <>
       <Card>
         <CardContent>
           <Typography variant="h6" gutterBottom>Admin Actions</Typography>
-          <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            gap: 2,
+            '& .MuiButton-root': {  
+              height: '48px',        
+              width: '100%',         
+              fontSize: '1rem',      
+              fontWeight: 500,       
+              textTransform: 'none',
+              justifyContent: 'flex-start',  // Align text and icon to the left
+              paddingLeft: '20px'            // Add some padding on the left
+            }
+          }}>
             <Button
               variant="contained"
               color="primary"
-              startIcon={<RefreshIcon />}
-              onClick={() => setConfirmDialog({ open: true, action: 'distribute' })}
-              disabled={game.isOpen || loading}
-              fullWidth
+              onClick={() => setAddPlayerDialogOpen(true)}
+              startIcon={<PersonAddIcon />}
+              sx={{
+                background: 'linear-gradient(45deg, #2196F3 30%, #21CBF3 90%)',
+                boxShadow: '0 3px 5px 2px rgba(33, 203, 243, .3)',
+                color: 'white',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #1976D2 30%, #00B4D8 90%)',
+                  boxShadow: '0 4px 6px 2px rgba(33, 203, 243, .4)',
+                }
+              }}
             >
-              Distribute Teams
+              Add Player
             </Button>
             <Button
               variant="contained"
-              color={game.isOpen ? "error" : "success"}
-              startIcon={game.isOpen ? <LockIcon /> : <LockOpenIcon />}
+              color="primary"
+              onClick={() => setConfirmDialog({ open: true, action: 'distribute' })}
+              disabled={loading || !game.players || game.players.length < 2}
+              startIcon={<ShuffleIcon />}
+            >
+              Distribute Players
+            </Button>
+            <Button
+              variant="contained"
+              color={game.status === 'closed' ? 'success' : 'error'}
               onClick={() => setConfirmDialog({ open: true, action: 'toggle' })}
               disabled={loading}
-              fullWidth
+              startIcon={game.status === 'closed' ? <LockOpenIcon /> : <LockIcon />}
             >
-              {game.isOpen ? 'Close Game' : 'Reopen Game'}
+              {game.status === 'closed' ? 'Open Registration' : 'Close Registration'}
             </Button>
             <Button
               variant="contained"
-              color="info"
-              startIcon={<EmailIcon />}
-              onClick={() => setConfirmDialog({ open: true, action: 'email' })}
+              color="primary"
+              onClick={onEmail}
               disabled={loading}
-              fullWidth
+              startIcon={<EmailIcon />}
             >
               Send Email
             </Button>
@@ -388,7 +334,7 @@ const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading }) 
         <DialogTitle>
           {confirmDialog.action === 'distribute' ? 'Distribute Teams' : 
            confirmDialog.action === 'email' ? 'Send Email Report' :
-           game.isOpen ? 'Close Game' : 'Reopen Game'}
+           game.status === 'closed' ? 'Open Registration' : 'Close Registration'}
         </DialogTitle>
         <DialogContent>
           <Typography>
@@ -396,9 +342,9 @@ const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading }) 
               ? 'This will randomly distribute all players into teams.'
               : confirmDialog.action === 'email'
               ? 'This will send an email report to all players.'
-              : game.isOpen 
-                ? 'This will close the game and send an email to all players.'
-                : 'This will reopen the game for new players to join.'}
+              : game.status === 'closed' 
+                ? 'This will open the game for new players to join.'
+                : 'This will close the game and send an email to all players.'}
           </Typography>
         </DialogContent>
         <DialogActions>
@@ -410,7 +356,88 @@ const AdminActions = ({ game, onDistribute, onToggleStatus, onEmail, loading }) 
           </Button>
         </DialogActions>
       </Dialog>
+
+      <AddPlayerDialog
+        open={addPlayerDialogOpen}
+        onClose={() => setAddPlayerDialogOpen(false)}
+        onAddPlayer={handleAddPlayer}
+        loading={loading}
+      />
     </>
+  );
+};
+
+const AddPlayerDialog = ({ open, onClose, onAddPlayer, loading }) => {
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [players, setPlayers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchPlayers = async () => {
+      try {
+        const usersRef = collection(db, 'users');
+        const snapshot = await getDocs(usersRef);
+        const playersList = snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(user => user.role !== 'admin'); // Exclude admins from the list
+        setPlayers(playersList);
+      } catch (error) {
+        console.error('Error fetching players:', error);
+        setError('Failed to load players');
+      }
+    };
+    fetchPlayers();
+  }, []);
+
+  const handleSubmit = async () => {
+    if (!selectedPlayer) {
+      setError('Please select a player');
+      return;
+    }
+    try {
+      await onAddPlayer(selectedPlayer.id);
+      onClose();
+    } catch (error) {
+      setError(error.message);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose}>
+      <DialogTitle>Add Player to Game</DialogTitle>
+      <DialogContent>
+        <Box sx={{ mt: 2, minWidth: 300 }}>
+          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          <Autocomplete
+            options={players}
+            getOptionLabel={(option) => 
+              `${option.firstName || ''} ${option.lastName || ''} ${option.email || ''}`
+            }
+            onChange={(event, newValue) => setSelectedPlayer(newValue)}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Select Player"
+                variant="outlined"
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            )}
+          />
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button 
+          onClick={handleSubmit} 
+          variant="contained" 
+          disabled={loading || !selectedPlayer}
+          startIcon={<PersonAddIcon />}
+        >
+          {loading ? <CircularProgress size={24} /> : 'Add Player'}
+        </Button>
+      </DialogActions>
+    </Dialog>
   );
 };
 
@@ -423,6 +450,7 @@ const GameDetail = () => {
   const [error, setError] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [timeUntilGame, setTimeUntilGame] = useState('');
+  const [playersData, setPlayersData] = useState({});
 
   // Check admin status
   useEffect(() => {
@@ -470,6 +498,29 @@ const GameDetail = () => {
 
     return () => unsubscribe();
   }, [id]);
+
+  useEffect(() => {
+    // Cleanup function for user listeners
+    return () => {
+      cleanupUserListeners();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (game?.players) {
+      // Get fresh player data for all players in the game
+      const loadPlayers = async () => {
+        try {
+          const playersData = await getPlayersData(game.players, currentUser?.uid);
+          setPlayersData(playersData);
+        } catch (error) {
+          console.error('Error loading players:', error);
+          setError('Failed to load player details');
+        }
+      };
+      loadPlayers();
+    }
+  }, [game?.players, currentUser?.uid]);
 
   const handleJoinLeave = async () => {
     if (!currentUser || !game) return;
@@ -528,6 +579,20 @@ const GameDetail = () => {
     }
   };
 
+  const handleAddPlayer = async (playerId) => {
+    try {
+      setLoading(true);
+      await addPlayerToGame(id, playerId);
+      // Refresh game data
+      const updatedGame = await getDoc(doc(db, 'games', id));
+      setGame({ id: updatedGame.id, ...updatedGame.data() });
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (!game) return (
     <Box display="flex" justifyContent="center" alignItems="center" minHeight="calc(100vh - 64px)">
       <CircularProgress />
@@ -553,6 +618,7 @@ const GameDetail = () => {
             onJoinLeave={handleJoinLeave}
             loading={loading}
             isOpen={game.isOpen}
+            playersData={playersData}
           />
         </Grid>
         {isAdmin && (
@@ -562,6 +628,7 @@ const GameDetail = () => {
               onDistribute={handleDistribute}
               onToggleStatus={handleToggleStatus}
               onEmail={handleEmail}
+              onAddPlayer={handleAddPlayer}
               loading={loading}
             />
           </Grid>

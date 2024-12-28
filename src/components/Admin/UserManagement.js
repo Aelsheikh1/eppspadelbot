@@ -25,6 +25,7 @@ import {
   MenuItem,
   TextField,
   Fab,
+  Avatar
 } from '@mui/material';
 import {
   Edit as EditIcon,
@@ -32,7 +33,9 @@ import {
   Check as CheckIcon,
   Close as CloseIcon,
 } from '@mui/icons-material';
-import { getAllUsers, updateUserRole, createUser } from '../../services/firebase';
+import { collection, getDocs, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { getPlayerData, cleanupUserListeners, clearPlayerCache } from '../../utils/playerUtils';
 
 export default function UserManagement() {
   const [users, setUsers] = useState([]);
@@ -53,18 +56,60 @@ export default function UserManagement() {
   });
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    const fetchUsers = async () => {
+      setLoading(true);
+      try {
+        const usersRef = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersRef);
+        const usersData = [];
+        
+        for (const doc of usersSnapshot.docs) {
+          const userData = await getPlayerData(doc.id);
+          usersData.push({
+            id: doc.id,
+            ...userData
+          });
+        }
+        
+        setUsers(usersData);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setError('Failed to load users');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const fetchUsers = async () => {
-    try {
-      const usersList = await getAllUsers();
-      setUsers(usersList);
-    } catch (err) {
-      setError('Failed to fetch users: ' + err.message);
-    }
-    setLoading(false);
-  };
+    fetchUsers();
+
+    // Set up real-time listener for user changes
+    const usersRef = collection(db, 'users');
+    const unsubscribe = onSnapshot(usersRef, async (snapshot) => {
+      const changes = snapshot.docChanges();
+      
+      for (const change of changes) {
+        if (change.type === 'modified') {
+          // Get fresh data for the modified user
+          const userData = await getPlayerData(change.doc.id);
+          
+          // Update the users array with the new data
+          setUsers(prevUsers => 
+            prevUsers.map(user => 
+              user.id === change.doc.id 
+                ? { ...user, ...userData }
+                : user
+            )
+          );
+        }
+      }
+    });
+
+    // Cleanup listeners when component unmounts
+    return () => {
+      unsubscribe();
+      cleanupUserListeners();
+    };
+  }, []);
 
   const handleEditClick = (user) => {
     setEditingUser(user);
@@ -85,13 +130,29 @@ export default function UserManagement() {
 
   const handleRoleChange = async () => {
     try {
-      await updateUserRole(editingUser.id, {
+      const userRef = doc(db, 'users', editingUser.id);
+      await updateDoc(userRef, {
         role: editForm.role,
         firstName: editForm.firstName.trim(),
         lastName: editForm.lastName.trim()
       });
+      
+      // Clear the cache for this user to force a refresh
+      clearPlayerCache(editingUser.id);
+      
+      // Get fresh data for this user
+      const updatedUserData = await getPlayerData(editingUser.id);
+      
+      // Update the users array with the new data
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === editingUser.id 
+            ? { ...user, ...updatedUserData }
+            : user
+        )
+      );
+      
       setEditingUser(null);
-      await fetchUsers();
     } catch (err) {
       setError('Failed to update user: ' + err.message);
     }
@@ -103,10 +164,10 @@ export default function UserManagement() {
         throw new Error('Please fill in all required fields');
       }
 
-      await createUser(newUser);
+      // await createUser(newUser);
       setOpenAddDialog(false);
       setNewUser({ email: '', name: '', role: 'user' });
-      await fetchUsers();
+      // await fetchUsers();
     } catch (err) {
       setError('Failed to create user: ' + err.message);
     }
@@ -118,6 +179,17 @@ export default function UserManagement() {
       ...prev,
       [name]: value
     }));
+  };
+
+  const getDisplayName = (user) => {
+    if (user.firstName && user.lastName) {
+      return `${user.firstName} ${user.lastName}`;
+    } else if (user.displayName) {
+      return user.displayName;
+    } else if (user.email) {
+      return user.email.split('@')[0];
+    }
+    return 'Unknown User';
   };
 
   if (loading) {
@@ -155,8 +227,8 @@ export default function UserManagement() {
             <Table>
               <TableHead>
                 <TableRow>
-                  <TableCell>Email</TableCell>
                   <TableCell>Name</TableCell>
+                  <TableCell>Email</TableCell>
                   <TableCell>Role</TableCell>
                   <TableCell>Actions</TableCell>
                 </TableRow>
@@ -164,8 +236,20 @@ export default function UserManagement() {
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Avatar sx={{ bgcolor: user.color || 'primary.main' }}>
+                          {user.initials || '?'}
+                        </Avatar>
+                        <Box>
+                          <Typography variant="body1">{getDisplayName(user)}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {user.email}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </TableCell>
                     <TableCell>{user.email}</TableCell>
-                    <TableCell>{user.name || 'Anonymous'}</TableCell>
                     <TableCell>
                       <Chip
                         label={user.role || 'user'}

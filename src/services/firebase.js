@@ -23,7 +23,12 @@ import {
   writeBatch,
   serverTimestamp,
   runTransaction,
+  query,
+  where,
+  orderBy,
+  addDoc
 } from 'firebase/firestore';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
@@ -38,6 +43,61 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+const messaging = getMessaging(app);
+
+console.log('Firebase initialized with messaging');
+
+// Initialize messaging
+let currentToken = '';
+
+// Function to request notification permission and get FCM token
+export async function requestNotificationPermission() {
+  console.log('Requesting notification permission...');
+  try {
+    const permission = await Notification.requestPermission();
+    console.log('Notification permission:', permission);
+    if (permission === 'granted') {
+      // Get FCM token
+      const token = await getToken(messaging, {
+        vapidKey: 'BIq74BpG72bX8YlHuDMfYpDtrcd2Q-Wg5U_5-aPV1dVTN4zBMwN_gZdwY0D3EzUYXWz7ONiRaPW-_jVzYpHppTo'
+      });
+      
+      console.log('FCM token:', token);
+      
+      if (token) {
+        currentToken = token;
+        // Store the token in the user's document
+        const user = auth.currentUser;
+        if (user) {
+          await updateDoc(doc(db, 'users', user.uid), {
+            fcmToken: token
+          });
+          console.log('Token stored in user document');
+        }
+        return token;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error requesting notification permission:', error);
+    return null;
+  }
+}
+
+// Function to handle foreground messages
+export function setupForegroundMessaging() {
+  console.log('Setting up foreground messaging...');
+  onMessage(messaging, (payload) => {
+    console.log('Received foreground message:', payload);
+    // Display notification using the browser's notification API
+    if (Notification.permission === 'granted') {
+      new Notification(payload.notification.title, {
+        body: payload.notification.body,
+        icon: payload.notification.icon
+      });
+    }
+  });
+}
 
 // Configure Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -207,6 +267,83 @@ export const signOut = async () => {
     throw error;
   }
 };
+
+// Notification Functions
+export async function getUserNotifications(userId) {
+  try {
+    const notificationsSnapshot = await getDocs(
+      query(
+        collection(db, 'notifications'),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc')
+      )
+    );
+    return notificationsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    return [];
+  }
+}
+
+export async function markNotificationAsRead(notificationId) {
+  try {
+    await updateDoc(doc(db, 'notifications', notificationId), {
+      read: true
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+  }
+}
+
+async function sendNotificationToUser(userId, title, body) {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userData = userDoc.data();
+    
+    if (userData?.fcmToken) {
+      // This will be handled by Cloud Functions to send the actual FCM message
+      await addDoc(collection(db, 'notifications'), {
+        token: userData.fcmToken,
+        title,
+        body,
+        userId,
+        createdAt: serverTimestamp(),
+        read: false
+      });
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+}
+
+async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
+  try {
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const notifications = usersSnapshot.docs
+      .filter(doc => doc.id !== excludeUserId && doc.data().fcmToken)
+      .map(doc => ({
+        token: doc.data().fcmToken,
+        title,
+        body,
+        userId: doc.id,
+        createdAt: serverTimestamp(),
+        read: false
+      }));
+
+    const batch = writeBatch(db);
+    notifications.forEach(notification => {
+      const notificationRef = doc(collection(db, 'notifications'));
+      batch.set(notificationRef, notification);
+    });
+
+    await batch.commit();
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+  }
+}
 
 // Game Functions
 export const joinGame = async (gameId, userId) => {
@@ -486,6 +623,47 @@ export const getUserData = async (userId) => {
     return null;
   } catch (error) {
     console.error('Error fetching user data:', error);
+    throw error;
+  }
+};
+
+export async function createGame(gameData) {
+  console.log('Creating game with data:', gameData);
+  try {
+    const gameRef = doc(collection(db, 'games'));
+    const newGame = {
+      ...gameData,
+      createdAt: serverTimestamp(),
+      status: 'open'
+    };
+    
+    await setDoc(gameRef, newGame);
+    console.log('Game created with ID:', gameRef.id);
+
+    // Create a detailed notification message
+    const notificationTitle = 'New Game Available! 🎾';
+    const notificationBody = `
+Date: ${gameData.date}
+Time: ${gameData.time}
+Location: ${gameData.location}
+Players: ${gameData.currentPlayers || 0}/${gameData.maxPlayers}
+Registration Ends: ${gameData.registrationEndTime}
+Price: ${gameData.price}€
+Level: ${gameData.level}
+`.trim();
+
+    console.log('Sending notification with:', { notificationTitle, notificationBody });
+
+    // Send notification to all users except the creator
+    await sendNotificationToAllUsers(
+      notificationTitle,
+      notificationBody,
+      gameData.createdBy
+    );
+
+    return gameRef.id;
+  } catch (error) {
+    console.error('Error creating game:', error);
     throw error;
   }
 };

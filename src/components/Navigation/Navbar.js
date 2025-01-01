@@ -26,6 +26,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import EditProfile from '../Profile/EditProfile';
 import { signOut } from '../../services/firebase';
+import NotificationBell from '../NotificationBell';
 
 export default function Navbar() {
   const [anchorElNav, setAnchorElNav] = useState(null);
@@ -207,6 +208,13 @@ export default function Navbar() {
                 </Button>
               ))}
             </Box>
+
+            {/* Add NotificationBell before the profile menu */}
+            {currentUser && (
+              <Box sx={{ mx: 1 }}>
+                <NotificationBell />
+              </Box>
+            )}
 
             {/* User Menu */}
             <Box sx={{ flexGrow: 0 }}>

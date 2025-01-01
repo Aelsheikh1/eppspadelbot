@@ -18,8 +18,46 @@ messaging.onBackgroundMessage((payload) => {
   const notificationTitle = payload.notification.title;
   const notificationOptions = {
     body: payload.notification.body,
-    icon: payload.notification.icon || '/logo192.png',
+    icon: '/logo192.png',
+    tag: 'game-notification',
+    data: {
+      url: self.location.origin + '/games'
+    }
   };
 
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  return self.registration.showNotification(notificationTitle, notificationOptions);
+});
+
+// Handle notification clicks
+self.addEventListener('notificationclick', (event) => {
+  console.log('Notification clicked:', event);
+  event.notification.close();
+
+  const urlToOpen = event.notification.data?.url || self.location.origin + '/games';
+
+  // This will focus on the tab if it exists, or create a new one if it doesn't
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        for (const client of clientList) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            return client.focus();
+          }
+        }
+        return clients.openWindow(urlToOpen);
+      })
+  );
+
+  // Notify the app about the click
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((clientList) => {
+        clientList.forEach((client) => {
+          client.postMessage({
+            type: 'NOTIFICATION_CLICK',
+            url: urlToOpen
+          });
+        });
+      })
+  );
 });

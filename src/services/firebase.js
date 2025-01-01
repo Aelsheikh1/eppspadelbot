@@ -93,8 +93,20 @@ export function setupForegroundMessaging() {
     if (Notification.permission === 'granted') {
       new Notification(payload.notification.title, {
         body: payload.notification.body,
-        icon: payload.notification.icon
+        icon: '/logo192.png',
+        tag: 'game-notification',
+        data: {
+          url: window.location.origin + '/games'
+        }
       });
+    }
+  });
+
+  // Add click handler for notifications
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'NOTIFICATION_CLICK') {
+      window.focus();
+      window.location.href = event.data.url || '/games';
     }
   });
 }
@@ -269,6 +281,90 @@ export const signOut = async () => {
 };
 
 // Notification Functions
+async function sendNotificationToUser(userId, title, body) {
+  try {
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userData = userDoc.data();
+    
+    if (userData?.fcmToken) {
+      // Store notification in Firestore
+      await addDoc(collection(db, 'notifications'), {
+        token: userData.fcmToken,
+        title,
+        body,
+        userId,
+        createdAt: serverTimestamp(),
+        read: false,
+        type: 'game',
+        link: '/games'
+      });
+
+      // Display notification if user is in foreground
+      if (Notification.permission === 'granted') {
+        new Notification(title, {
+          body,
+          icon: '/logo192.png',
+          tag: 'game-notification',
+          data: {
+            url: window.location.origin + '/games'
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Error sending notification:', error);
+  }
+}
+
+async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
+  try {
+    console.log('Sending notifications to all users:', { title, body, excludeUserId });
+    const usersSnapshot = await getDocs(collection(db, 'users'));
+    const batch = writeBatch(db);
+    
+    const notifications = [];
+    usersSnapshot.forEach(doc => {
+      const userData = doc.data();
+      if (doc.id !== excludeUserId && userData.fcmToken) {
+        const notificationRef = doc(collection(db, 'notifications'));
+        const notification = {
+          token: userData.fcmToken,
+          title,
+          body,
+          userId: doc.id,
+          createdAt: serverTimestamp(),
+          read: false,
+          type: 'game',
+          link: '/games'
+        };
+        notifications.push({ ref: notificationRef, data: notification });
+      }
+    });
+
+    // Use batch write to store all notifications
+    notifications.forEach(({ ref, data }) => {
+      batch.set(ref, data);
+    });
+    await batch.commit();
+
+    // Display notifications for users in foreground
+    if (Notification.permission === 'granted' && auth.currentUser?.uid !== excludeUserId) {
+      new Notification(title, {
+        body,
+        icon: '/logo192.png',
+        tag: 'game-notification',
+        data: {
+          url: window.location.origin + '/games'
+        }
+      });
+    }
+
+    console.log('Successfully sent notifications to', notifications.length, 'users');
+  } catch (error) {
+    console.error('Error sending notifications:', error);
+  }
+}
+
 export async function getUserNotifications(userId) {
   try {
     const notificationsSnapshot = await getDocs(
@@ -295,53 +391,6 @@ export async function markNotificationAsRead(notificationId) {
     });
   } catch (error) {
     console.error('Error marking notification as read:', error);
-  }
-}
-
-async function sendNotificationToUser(userId, title, body) {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    const userData = userDoc.data();
-    
-    if (userData?.fcmToken) {
-      // This will be handled by Cloud Functions to send the actual FCM message
-      await addDoc(collection(db, 'notifications'), {
-        token: userData.fcmToken,
-        title,
-        body,
-        userId,
-        createdAt: serverTimestamp(),
-        read: false
-      });
-    }
-  } catch (error) {
-    console.error('Error sending notification:', error);
-  }
-}
-
-async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
-  try {
-    const usersSnapshot = await getDocs(collection(db, 'users'));
-    const notifications = usersSnapshot.docs
-      .filter(doc => doc.id !== excludeUserId && doc.data().fcmToken)
-      .map(doc => ({
-        token: doc.data().fcmToken,
-        title,
-        body,
-        userId: doc.id,
-        createdAt: serverTimestamp(),
-        read: false
-      }));
-
-    const batch = writeBatch(db);
-    notifications.forEach(notification => {
-      const notificationRef = doc(collection(db, 'notifications'));
-      batch.set(notificationRef, notification);
-    });
-
-    await batch.commit();
-  } catch (error) {
-    console.error('Error sending notifications:', error);
   }
 }
 

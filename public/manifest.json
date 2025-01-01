@@ -1,0 +1,21 @@
+{
+  "short_name": "PadelBolt",
+  "name": "PadelBolt - Padel Game Organizer",
+  "icons": [
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "https://eppspadelbot.vercel.app",
+  "display": "standalone",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "gcm_sender_id": "773090904452"
+}

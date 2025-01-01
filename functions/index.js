@@ -8,18 +8,33 @@ exports.sendNotification = functions.firestore
   .onCreate(async (snap, context) => {
     try {
       const notification = snap.data();
-      const { token, title, body } = notification;
+      const { token, title, body, type, link } = notification;
 
       const message = {
         token,
         notification: {
           title,
           body,
+          icon: '/logo192.png'
         },
         webpush: {
+          notification: {
+            icon: '/logo192.png',
+            badge: '/logo192.png',
+            actions: [
+              {
+                action: 'open',
+                title: 'View Game'
+              }
+            ]
+          },
           fcmOptions: {
-            link: 'https://padelbolt-5d9a2.firebaseapp.com/games'
+            link: `https://padelbolt-5d9a2.firebaseapp.com${link || '/games'}`
           }
+        },
+        data: {
+          type,
+          link: link || '/games'
         }
       };
 
@@ -31,4 +46,27 @@ exports.sendNotification = functions.firestore
       console.error('Error sending notification:', error);
       return null;
     }
+  });
+
+// Clean up old notifications
+exports.cleanupOldNotifications = functions.pubsub
+  .schedule('every 24 hours')
+  .onRun(async (context) => {
+    const oneMonthAgo = admin.firestore.Timestamp.fromDate(
+      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    );
+
+    const batch = admin.firestore().batch();
+    const snapshot = await admin.firestore()
+      .collection('notifications')
+      .where('createdAt', '<', oneMonthAgo)
+      .get();
+
+    snapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+    console.log(`Deleted ${snapshot.size} old notifications`);
+    return null;
   });

@@ -1,19 +1,42 @@
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js');
 
-const firebaseConfig = {
-  apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
-  authDomain: "padelbolt-5d9a2.firebaseapp.com",
-  projectId: "padelbolt-5d9a2",
-  storageBucket: "padelbolt-5d9a2.appspot.com",
-  messagingSenderId: "773090904452",
-  appId: "1:773090904452:web:e33380da424fe8d69e75d1",
-  measurementId: "G-1PRKH5C8NV",
-  vapidKey: "BIq74BpG72bX8YlHuDMfYpDtrcd2Q-Wg5U_5-aPV1dVTN4zBMwN_gZdwY0D3EzUYXWz7ONiRaPW-_jVzYpHppTo"
-};
+let app;
+let messaging;
 
-const app = firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging(app);
+// Listen for messages from the main thread
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+    // Initialize Firebase with the received config
+    app = firebase.initializeApp(event.data.config);
+    messaging = firebase.messaging(app);
+    
+    // Set up background message handler
+    messaging.onBackgroundMessage((payload) => {
+      console.log('Received background message:', payload);
+
+      const notificationTitle = payload.notification.title;
+      const notificationOptions = {
+        body: payload.notification.body,
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        tag: 'game-notification',
+        data: payload.data || {
+          url: 'https://eppspadelbot.vercel.app/games'
+        },
+        actions: [
+          {
+            action: 'open',
+            title: 'View Game'
+          }
+        ],
+        requireInteraction: true
+      };
+
+      return self.registration.showNotification(notificationTitle, notificationOptions);
+    });
+  }
+});
 
 // Log when the service worker is installed
 self.addEventListener('install', (event) => {
@@ -25,31 +48,6 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   console.log('Service Worker activated:', event);
   event.waitUntil(clients.claim()); // Take control of all clients immediately
-});
-
-// Handle background messages
-messaging.onBackgroundMessage((payload) => {
-  console.log('Received background message:', payload);
-
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/logo192.png',
-    badge: '/logo192.png',
-    tag: 'game-notification',
-    data: payload.data || {
-      url: 'https://eppspadelbot.vercel.app/games'
-    },
-    actions: [
-      {
-        action: 'open',
-        title: 'View Game'
-      }
-    ],
-    requireInteraction: true // Keep the notification visible until user interacts with it
-  };
-
-  return self.registration.showNotification(notificationTitle, notificationOptions);
 });
 
 // Handle notification click

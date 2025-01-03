@@ -31,14 +31,14 @@ import {
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
-  authDomain: "padelbolt-5d9a2.firebaseapp.com",
-  projectId: "padelbolt-5d9a2",
-  storageBucket: "padelbolt-5d9a2.appspot.com",
-  messagingSenderId: "773090904452",
-  appId: "1:773090904452:web:e33380da424fe8d69e75d1",
-  measurementId: "G-1PRKH5C8NV",
-  vapidKey: "BIq74BpG72bX8YlHuDMfYpDtrcd2Q-Wg5U_5-aPV1dVTN4zBMwN_gZdwY0D3EzUYXWz7ONiRaPW-_jVzYpHppTo"
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.REACT_APP_FIREBASE_APP_ID,
+  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
+  vapidKey: process.env.REACT_APP_FIREBASE_VAPID_KEY
 };
 
 const app = initializeApp(firebaseConfig);

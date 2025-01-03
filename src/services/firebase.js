@@ -29,6 +29,7 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { sendNotification } from './fcm';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -70,7 +71,7 @@ export const requestNotificationPermission = async () => {
 
           // Get the messaging token
           const token = await getToken(messaging, {
-            vapidKey: firebaseConfig.vapidKey,
+            vapidKey: process.env.REACT_APP_FIREBASE_VAPID_KEY,
             serviceWorkerRegistration: registration
           });
           console.log('FCM Token:', token);
@@ -730,27 +731,22 @@ export const getUserData = async (userId) => {
 };
 
 export const createGame = async (gameData) => {
-  console.log('Creating game with data:', gameData);
   try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('User must be logged in to create a game');
+    }
+
     // Add the game to Firestore
     const gameRef = await addDoc(collection(db, 'games'), {
       ...gameData,
+      createdBy: currentUser.uid,
       createdAt: serverTimestamp(),
-      createdBy: auth.currentUser.uid,
-      players: [auth.currentUser.uid],
-      status: 'open'
+      status: 'open',
+      players: [currentUser.uid]
     });
-    console.log('Game created with ID:', gameRef.id);
 
-    // Format the notification message
-    const title = 'New Game Created!';
-    const body = `${gameData.date} at ${gameData.time}\nLocation: ${gameData.location}\nPlayers: ${gameData.maxPlayers}\nLevel: ${gameData.level}\nPrice: ${gameData.price}`;
-
-    // Send notifications to all users except the creator
-    console.log('Sending notifications for new game');
-    await sendNotificationToAllUsers(title, body, auth.currentUser.uid);
-
-    return gameRef;
+    return gameRef.id;
   } catch (error) {
     console.error('Error creating game:', error);
     throw error;

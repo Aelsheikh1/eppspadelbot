@@ -15,22 +15,34 @@ self.addEventListener('message', (event) => {
     messaging.onBackgroundMessage((payload) => {
       console.log('Received background message:', payload);
 
-      const notificationTitle = payload.notification.title;
+      // Extract notification data
+      const notificationTitle = payload.notification.title || 'New Game Available!';
+      const notificationBody = payload.notification.body || 'A new game has been created!';
+      const notificationData = payload.data || {};
+      const gameUrl = notificationData.url || 'https://eppspadelbot.vercel.app/games';
+
       const notificationOptions = {
-        body: payload.notification.body,
+        body: notificationBody,
         icon: '/logo192.png',
         badge: '/logo192.png',
         tag: 'game-notification',
-        data: payload.data || {
-          url: 'https://eppspadelbot.vercel.app/games'
+        data: {
+          url: gameUrl,
+          gameId: notificationData.gameId
         },
         actions: [
           {
             action: 'open',
             title: 'View Game'
+          },
+          {
+            action: 'close',
+            title: 'Dismiss'
           }
         ],
-        requireInteraction: true
+        requireInteraction: true, // Keep notification visible until user interacts
+        vibrate: [200, 100, 200], // Vibration pattern
+        renotify: true // Always notify, even if there's an existing notification
       };
 
       return self.registration.showNotification(notificationTitle, notificationOptions);
@@ -54,22 +66,33 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('notificationclick', (event) => {
   console.log('Notification clicked:', event);
 
+  // Close the notification
   event.notification.close();
 
-  const urlToOpen = event.notification.data?.url || 'https://eppspadelbot.vercel.app/games';
+  // Get the action (if any)
+  const action = event.action;
+  const notification = event.notification;
+  const data = notification.data || {};
+  const urlToOpen = data.url || 'https://eppspadelbot.vercel.app/games';
 
+  if (action === 'close') {
+    return; // Just close the notification
+  }
+
+  // Focus on existing window or open new one
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Check if there is already a window/tab open with the target URL
-      for (let client of windowClients) {
-        if (client.url === urlToOpen && 'focus' in client) {
-          return client.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true })
+      .then((windowClients) => {
+        // Try to find an existing window
+        for (const client of windowClients) {
+          if (client.url === urlToOpen && 'focus' in client) {
+            return client.focus();
+          }
         }
-      }
-      // If no window/tab is open, open a new one
-      if (clients.openWindow) {
-        return clients.openWindow(urlToOpen);
-      }
-    })
+        // If no existing window, open a new one
+        if (clients.openWindow) {
+          return clients.openWindow(urlToOpen);
+        }
+      })
   );
 });

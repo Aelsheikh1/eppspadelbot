@@ -37,7 +37,8 @@ const firebaseConfig = {
   storageBucket: "padelbolt-5d9a2.appspot.com",
   messagingSenderId: "773090904452",
   appId: "1:773090904452:web:e33380da424fe8d69e75d1",
-  measurementId: "G-1PRKH5C8NV"
+  measurementId: "G-1PRKH5C8NV",
+  vapidKey: "BIq74BpG72bX8YlHuDMfYpDtrcd2Q-Wg5U_5-aPV1dVTN4zBMwN_gZdwY0D3EzUYXWz7ONiRaPW-_jVzYpHppTo"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -69,17 +70,18 @@ export const requestNotificationPermission = async () => {
 
           // Get the messaging token
           const token = await getToken(messaging, {
-            vapidKey: 'BIq74BpG72bX8YlHuDMfYpDtrcd2Q-Wg5U_5-aPV1dVTN4zBMwN_gZdwY0D3EzUYXWz7ONiRaPW-_jVzYpHppTo',
+            vapidKey: firebaseConfig.vapidKey,
             serviceWorkerRegistration: registration
           });
           console.log('FCM Token:', token);
 
           // Store the token in Firestore
           if (token && auth.currentUser) {
-            const userRef = doc(db, 'users', auth.currentUser.uid);
-            await updateDoc(userRef, {
-              fcmToken: token,
-              lastTokenUpdate: serverTimestamp()
+            const tokenRef = doc(db, 'fcmTokens', auth.currentUser.uid);
+            await setDoc(tokenRef, {
+              token,
+              userId: auth.currentUser.uid,
+              lastUpdated: serverTimestamp()
             });
             console.log('Token stored in Firestore');
           }
@@ -114,14 +116,24 @@ export function setupForegroundMessaging() {
 
     onMessage(messaging, (payload) => {
       console.log('Received foreground message:', payload);
-      if (Notification.permission === 'granted') {
-        new Notification(payload.notification.title, {
-          body: payload.notification.body,
-          icon: '/logo192.png',
-          tag: 'game-notification',
-          data: {
-            url: 'https://eppspadelbot.vercel.app/games'
-          }
+      if (Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.showNotification(payload.notification.title, {
+            body: payload.notification.body,
+            icon: '/logo192.png',
+            badge: '/logo192.png',
+            tag: 'game-notification',
+            data: payload.data || {
+              url: 'https://eppspadelbot.vercel.app/games'
+            },
+            actions: [
+              {
+                action: 'open',
+                title: 'View Game'
+              }
+            ],
+            requireInteraction: true
+          });
         });
       }
     });
@@ -309,49 +321,81 @@ export const signOut = async () => {
   }
 };
 
-// Notification Functions
-async function sendNotificationToUser(userId, title, body) {
-  console.log('Sending notification to user:', userId);
+// Function to get user's FCM token
+export const getUserFCMToken = async (userId) => {
   try {
-    const userDoc = await getDoc(doc(db, 'users', userId));
-    const userData = userDoc.data();
-    console.log('User data:', userData);
-    
-    if (userData?.fcmToken) {
-      console.log('Found FCM token:', userData.fcmToken);
-      // Store notification in Firestore
-      const notificationRef = await addDoc(collection(db, 'notifications'), {
-        token: userData.fcmToken,
-        title,
-        body,
-        userId,
-        createdAt: serverTimestamp(),
-        read: false,
-        type: 'game',
-        link: '/games'
-      });
-      console.log('Notification stored with ID:', notificationRef.id);
+    const tokenDoc = await getDoc(doc(db, 'fcmTokens', userId));
+    return tokenDoc.exists() ? tokenDoc.data().token : null;
+  } catch (error) {
+    console.error('Error getting user FCM token:', error);
+    return null;
+  }
+};
 
-      // Display notification if user is in foreground
-      if (Notification.permission === 'granted') {
-        new Notification(title, {
-          body,
-          icon: '/logo192.png',
-          tag: 'game-notification',
-          data: {
-            url: window.location.origin + '/games'
-          }
-        });
-      }
-    } else {
+// Function to send notification to a specific user
+export const sendNotificationToUser = async (userId, title, body, data = {}) => {
+  try {
+    // Get the user's FCM token
+    const fcmToken = await getUserFCMToken(userId);
+    if (!fcmToken) {
       console.warn('No FCM token found for user:', userId);
+      return;
     }
+
+    // Store notification in Firestore
+    const notificationRef = await addDoc(collection(db, 'notifications'), {
+      userId,
+      title,
+      body,
+      data,
+      timestamp: serverTimestamp(),
+      read: false
+    });
+
+    console.log('Notification stored in Firestore:', notificationRef.id);
   } catch (error) {
     console.error('Error sending notification:', error);
+    throw error;
   }
-}
+};
 
-async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
+// Function to get user's notifications
+export const getUserNotifications = async (userId) => {
+  try {
+    const q = query(
+      collection(db, 'notifications'),
+      where('userId', '==', userId),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      timestamp: doc.data().timestamp?.toDate()
+    }));
+  } catch (error) {
+    console.error('Error getting notifications:', error);
+    throw error;
+  }
+};
+
+// Function to mark notification as read
+export const markNotificationAsRead = async (notificationId) => {
+  try {
+    const notificationRef = doc(db, 'notifications', notificationId);
+    await updateDoc(notificationRef, {
+      read: true,
+      readAt: serverTimestamp()
+    });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    throw error;
+  }
+};
+
+// Function to send notification to all users
+export const sendNotificationToAllUsers = async (title, body, excludeUserId = null) => {
   console.log('Sending notifications to all users:', { title, body, excludeUserId });
   try {
     const usersSnapshot = await getDocs(collection(db, 'users'));
@@ -359,26 +403,24 @@ async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
     
     const batch = writeBatch(db);
     const notifications = [];
+    const currentUser = auth.currentUser;
 
     usersSnapshot.forEach(doc => {
       const userData = doc.data();
-      if (doc.id !== excludeUserId && userData.fcmToken) {
+      if (doc.id !== excludeUserId) {
         console.log('Creating notification for user:', doc.id);
         const notificationRef = doc(collection(db, 'notifications'));
         const notification = {
-          token: userData.fcmToken,
+          userId: doc.id,
           title,
           body,
-          userId: doc.id,
-          createdAt: serverTimestamp(),
-          read: false,
-          type: 'game',
-          link: '/games'
+          timestamp: serverTimestamp(),
+          read: false
         };
         notifications.push({ ref: notificationRef, data: notification });
         batch.set(notificationRef, notification);
       } else {
-        console.log('Skipping user:', doc.id, 'No token or excluded user');
+        console.log('Skipping user:', doc.id, 'Excluded user');
       }
     });
 
@@ -386,7 +428,7 @@ async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
       await batch.commit();
       console.log('Successfully stored notifications for', notifications.length, 'users');
     } else {
-      console.warn('No notifications to send - no users with FCM tokens found');
+      console.warn('No notifications to send - no users found');
     }
 
     // Display notifications for users in foreground
@@ -403,36 +445,7 @@ async function sendNotificationToAllUsers(title, body, excludeUserId = null) {
   } catch (error) {
     console.error('Error sending notifications:', error);
   }
-}
-
-export async function getUserNotifications(userId) {
-  try {
-    const notificationsSnapshot = await getDocs(
-      query(
-        collection(db, 'notifications'),
-        where('userId', '==', userId),
-        orderBy('createdAt', 'desc')
-      )
-    );
-    return notificationsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
-  } catch (error) {
-    console.error('Error getting notifications:', error);
-    return [];
-  }
-}
-
-export async function markNotificationAsRead(notificationId) {
-  try {
-    await updateDoc(doc(db, 'notifications', notificationId), {
-      read: true
-    });
-  } catch (error) {
-    console.error('Error marking notification as read:', error);
-  }
-}
+};
 
 // Game Functions
 export const joinGame = async (gameId, userId) => {

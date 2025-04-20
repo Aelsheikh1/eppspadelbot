@@ -1,0 +1,47 @@
+{
+  "name": "EPPS Padel Bolt",
+  "short_name": "EPPS Padel",
+  "icons": [
+    {
+      "src": "/web-app-manifest-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/web-app-manifest-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon-96x96.png",
+      "sizes": "96x96",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "/",
+  "description": "Professional Padel Game Management System",
+  "theme_color": "#000000",
+  "background_color": "#ffffff",
+  "display": "standalone",
+  "orientation": "portrait",
+  "categories": ["sports", "games", "utilities"],
+  "shortcuts": [
+    {
+      "name": "New Game",
+      "url": "/games/new",
+      "description": "Create a new padel game"
+    },
+    {
+      "name": "My Games",
+      "url": "/games",
+      "description": "View your padel games"
+    }
+  ]
+}

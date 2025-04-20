@@ -1,0 +1,71 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isAdmin() {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    
+    function isCurrentUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isGameParticipant(gameData) {
+      return isSignedIn() && (
+        gameData.players.hasAny([request.auth.uid]) || 
+        gameData.createdBy == request.auth.uid
+      );
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isCurrentUser(userId) || isAdmin();
+      
+      // Allow FCM token updates
+      match /tokens/{tokenId} {
+        allow read, write: if isCurrentUser(userId);
+      }
+    }
+
+    // Games collection
+    match /games/{gameId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isGameParticipant(resource.data) ||
+        isAdmin() ||
+        // Allow updates for game expiration
+        (request.resource.data.status == 'closed' && 
+         request.resource.data.closedByTimer == true)
+      );
+      allow delete: if isAdmin();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.recipientId == request.auth.uid
+      );
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.recipientId == request.auth.uid ||
+        isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // FCM Tokens collection
+    match /fcmTokens/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isCurrentUser(userId);
+    }
+  }
+}

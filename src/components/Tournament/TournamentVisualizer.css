@@ -1,0 +1,354 @@
+/* Tournament Visualizer Styles */
+
+.tournament-container {
+  width: 100%;
+  overflow-x: auto;
+  padding: 20px 0;
+}
+
+.tournament-header {
+  background: linear-gradient(135deg, #1976d2, #0d47a1);
+  color: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
+
+.tournament-title {
+  display: flex;
+  align-items: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.tournament-title i {
+  margin-right: 10px;
+  font-size: 1.8rem;
+}
+
+.tournament-status {
+  background-color: rgba(255, 255, 255, 0.2);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+}
+
+.tournament-status i {
+  margin-right: 5px;
+}
+
+/* Knockout Tournament Styles */
+.tournament-bracket {
+  display: flex;
+  padding: 30px 10px;
+  background: linear-gradient(to bottom, #f9f9f9, #ffffff);
+  border-radius: 8px;
+  position: relative;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.round {
+  display: flex;
+  flex-direction: column;
+  min-width: 240px;
+  margin-right: 50px;
+  position: relative;
+}
+
+.round:last-child {
+  margin-right: 0;
+}
+
+.round-title {
+  background: linear-gradient(135deg, #1976d2, #0d47a1);
+  color: white;
+  padding: 12px 15px;
+  text-align: center;
+  border-radius: 8px 8px 0 0;
+  font-weight: bold;
+  margin-bottom: 25px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.round-title i {
+  margin-right: 8px;
+}
+
+.match {
+  border: none;
+  border-radius: 10px;
+  padding: 0;
+  margin-bottom: 30px;
+  background-color: white;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.match:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+}
+
+.match.completed {
+  border-left: 5px solid #4caf50;
+}
+
+.match-header {
+  background: linear-gradient(to right, #f5f5f5, #eeeeee);
+  padding: 8px 12px;
+  font-size: 0.85rem;
+  color: #555;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+}
+
+.match-status {
+  display: inline-flex;
+  align-items: center;
+  background-color: #e0e0e0;
+  color: #555;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.match-status.completed {
+  background-color: #4caf50;
+  color: white;
+}
+
+.match-status i {
+  margin-right: 4px;
+  font-size: 0.7rem;
+}
+
+.team {
+  display: flex;
+  align-items: center;
+  padding: 12px 15px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  position: relative;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  background-color: white;
+}
+
+.team:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.team.winner {
+  background-color: rgba(76, 175, 80, 0.1);
+  border-left: 4px solid #4caf50;
+}
+
+.team.winner::after {
+  content: '🏆';
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  font-size: 14px;
+}
+
+.team-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #3f51b5, #1a237e);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  margin-right: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  text-transform: uppercase;
+}
+
+.team-name {
+  flex-grow: 1;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  flex-direction: column;
+}
+
+.team-players {
+  font-size: 12px;
+  color: #757575;
+  margin-top: 3px;
+  display: flex;
+  align-items: center;
+}
+
+.team-players i {
+  margin-right: 5px;
+  font-size: 11px;
+  color: #9e9e9e;
+}
+
+.team-score {
+  font-weight: bold;
+  min-width: 30px;
+  height: 30px;
+  background-color: #f5f5f5;
+  border-radius: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  margin-left: 10px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.team.winner .team-score {
+  background-color: #4caf50;
+  color: white;
+}
+
+.connector {
+  position: absolute;
+  right: -25px;
+  width: 25px;
+  height: 2px;
+  background-color: #e0e0e0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.connector.active {
+  background-color: #4caf50;
+}
+
+/* League Table Styles */
+.league-table-container {
+  margin-top: 30px;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.08);
+}
+
+.league-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+}
+
+.league-table th, .league-table td {
+  padding: 12px 15px;
+  text-align: center;
+}
+
+.league-table th {
+  background: linear-gradient(135deg, #1976d2, #0d47a1);
+  color: white;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+  border: none;
+}
+
+.league-table td {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.league-table tr:last-child td {
+  border-bottom: none;
+}
+
+.league-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.league-table tr:hover {
+  background-color: #f5f5f5;
+}
+
+.team-position {
+  font-weight: bold;
+  width: 40px;
+}
+
+.team-position.top {
+  color: #4caf50;
+}
+
+.team-position.bottom {
+  color: #f44336;
+}
+
+.team-cell {
+  text-align: left;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+}
+
+.team-cell .team-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.points-cell {
+  font-weight: bold;
+  font-size: 1.1rem;
+  color: #1976d2;
+}
+
+/* Trophy and Winner Display */
+.trophy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f9fbe7, #f0f4c3);
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.trophy-icon {
+  font-size: 60px;
+  color: #ffc107;
+  margin-bottom: 10px;
+  text-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+.winner-label {
+  font-size: 1.2rem;
+  color: #555;
+  margin-bottom: 5px;
+}
+
+.winner-name {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: #1a237e;
+  margin-bottom: 10px;
+}
+
+.winner-players {
+  font-size: 1rem;
+  color: #555;
+}

@@ -57,43 +57,8 @@
     <title>EPPS Padel Bolt</title>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   
-    <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <script>
-      window.OneSignal = window.OneSignal || [];
-      OneSignal.push(function() {
-        OneSignal.init({
-          appId: "6c89c857-e106-437a-b445-7150edf7cf22",
-          safari_web_id: "web.onesignal.auto.1b1338f0-ae7a-49c0-a5a1-0112be9b9bea",
-          notifyButton: {
-            enable: true,
-            prenotify: true,
-            showNativePrompt: true,
-            showHttpPrompt: true,
-            showCredit: false,
-            position: {
-              horizontal: 'right',
-              vertical: 'bottom'
-            }
-          },
-          allowLocalhostAsSecureOrigin: true
-        });
-        // Debug logging
-        OneSignal.getUserId().then(function(userId) {
-          console.log('[OneSignal] User ID:', userId);
-        });
-        OneSignal.getSubscription().then(function(isSubscribed) {
-          console.log('[OneSignal] Is subscribed:', isSubscribed);
-        });
-        // Listen for subscription state changes to update UI
-        OneSignal.on('subscriptionChange', function(isSubscribed) {
-          console.log('[OneSignal] subscriptionChange:', isSubscribed);
-        });
-      });
-    </script>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
 

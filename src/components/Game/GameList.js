@@ -729,7 +729,7 @@ export default function GameList() {
     display: 'flex',
     alignItems: 'center',
     gap: { xs: 0.5, sm: 1.5 },
-    flexWrap: 'nowrap',
+    flexWrap: { xs: 'wrap', sm: 'nowrap' },
     minWidth: 0,
     ml: 'auto',
     position: 'relative',
@@ -1292,11 +1292,11 @@ export default function GameList() {
                             )}
                             
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-                              {(team.players || []).map((p,j) => {
+                              {(team.players || []).map((p,idx) => {
                                 const isCurrentUser = p === currentUser?.uid;
                                 return (
                                   <Chip
-                                    key={j}
+                                    key={idx}
                                     avatar={<Avatar sx={{ bgcolor: isCurrentUser ? 'primary.main' : undefined }}>{renderPlayerName(p)[0]}</Avatar>}
                                     label={renderPlayerName(p)}
                                     size="small"

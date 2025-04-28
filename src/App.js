@@ -80,53 +80,7 @@ const NavbarWrapper = () => {
 
 function App() {
   useEffect(() => {
-    // Wait for OneSignal SDK to be loaded
-    if (!window.OneSignal) {
-      console.warn('[OneSignal] SDK not loaded yet');
-      return;
-    }
-    window.OneSignal = window.OneSignal || [];
-    // Robust OneSignal initialization with retry logic
-    let onesignalInitAttempts = 0;
-    function tryInitOneSignal() {
-      if (!window.OneSignal) {
-        if (onesignalInitAttempts < 10) {
-          onesignalInitAttempts++;
-          console.log(`[OneSignal] SDK not loaded yet, retrying (${onesignalInitAttempts})...`);
-          setTimeout(tryInitOneSignal, 500);
-        } else {
-          console.error('[OneSignal] SDK failed to load after multiple attempts.');
-        }
-        return;
-      }
-      window.OneSignal = window.OneSignal || [];
-      if (!window.__ONESIGNAL_INIT) {
-        window.__ONESIGNAL_INIT = true;
-        window.OneSignal.push(function() {
-          window.OneSignal.init({
-            appId: '6c89c857-e106-437a-b445-7150edf7cf22',
-            notifyButton: { enable: true },
-            allowLocalhostAsSecureOrigin: true,
-            serviceWorkerPath: 'OneSignalSDKWorker.js',
-            serviceWorkerUpdaterPath: 'OneSignalSDKUpdaterWorker.js',
-            serviceWorkerParam: { scope: '/' }
-          });
 
-          // Debug logging
-          window.OneSignal.isPushNotificationsEnabled().then(function(isEnabled) {
-            console.log('[OneSignal] Push notifications enabled:', isEnabled);
-          });
-          window.OneSignal.getUserId().then(function(userId) {
-            console.log('[OneSignal] Player ID:', userId);
-          });
-          window.OneSignal.getSubscription().then(function(isSubscribed) {
-            console.log('[OneSignal] Is subscribed:', isSubscribed);
-          });
-          console.log('[OneSignal] Browser Notification.permission:', Notification.permission);
-        });
-      }
-    }
-    tryInitOneSignal();
   }, []);
   
   const triggerTestNotification = () => {

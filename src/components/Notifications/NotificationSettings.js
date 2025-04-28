@@ -10,7 +10,8 @@ import {
   Snackbar,
   Alert,
   CircularProgress,
-  Divider
+  Divider,
+  Chip
 } from '@mui/material';
 import {
   Notifications as NotificationsIcon,
@@ -22,8 +23,11 @@ import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { updateNotificationSettings } from '../../services/notificationService';
 import NotificationTester from './NotificationTester';
+import FloatingBell from '../FloatingBell';
 
 const NotificationSettings = () => {
+
+
   const [settings, setSettings] = useState({
     gameCreated: true,
     gameClosingSoon: true,
@@ -146,39 +150,68 @@ const NotificationSettings = () => {
     );
   }
 
+  // Handler for floating bell click
+  const handleBellClick = () => {
+    if (!window.OneSignal || typeof window.OneSignal.push !== 'function') {
+      setSnackbar({
+        open: true,
+        message: 'Notification system not ready. Please wait or refresh.',
+        severity: 'warning'
+      });
+      return;
+    }
+    window.OneSignal.push(async function(OneSignal) {
+
+      if (typeof OneSignal.showSlidedownPrompt === 'function') {
+        await OneSignal.showSlidedownPrompt();
+      }
+
+    });
+  };
+
+
+
   return (
     <Box>
       <Paper elevation={2} sx={{ p: 3, mb: 3 }}>
-        <Box display="flex" alignItems="center" mb={2}>
-          <NotificationsIcon sx={{ mr: 1 }} />
-          <Typography variant="h5">Notification Settings</Typography>
-        </Box>
-
-      {permissionStatus !== 'granted' && (
-        <Box mb={3} p={2} bgcolor="#f5f5f5" borderRadius={1}>
-          <Box display="flex" alignItems="center" mb={1}>
-            <NotificationsOffIcon color="warning" sx={{ mr: 1 }} />
-            <Typography variant="subtitle1" fontWeight="bold">
-              Notifications are {permissionStatus === 'denied' ? 'blocked' : 'not enabled'}
+        <Box mb={3}>
+          <Box display="flex" alignItems="center" gap={1} mb={1}>
+            <NotificationsIcon color="primary" />
+            <Typography variant="h5" fontWeight="bold">
+              Notification Settings
             </Typography>
           </Box>
-          <Typography variant="body2" mb={2}>
+          <Box display="flex" alignItems="center" gap={1} sx={{ mb: 1 }}>
+            <Typography variant="subtitle1" fontWeight="bold">
+              Status:
+            </Typography>
+            {permissionStatus === 'granted' && (
+              <Chip label="Enabled" color="success" sx={{ fontWeight: 600, fontSize: '1rem' }} />
+            )}
+            {permissionStatus === 'denied' && (
+              <Chip label="Blocked" color="error" sx={{ fontWeight: 600, fontSize: '1rem' }} />
+            )}
+            {permissionStatus !== 'granted' && permissionStatus !== 'denied' && (
+              <Chip label="Not Enabled" color="warning" sx={{ fontWeight: 600, fontSize: '1rem' }} />
+            )}
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             {permissionStatus === 'denied'
               ? 'You have blocked notifications. Please enable them in your browser settings to receive game updates.'
               : 'Enable notifications to receive updates about games and tournaments.'}
           </Typography>
-          {permissionStatus !== 'denied' && (
+          {permissionStatus !== 'granted' && (
             <Button
               variant="contained"
               color="primary"
               startIcon={<NotificationsActiveIcon />}
               onClick={handleRequestPermission}
+              sx={{ mt: 1 }}
             >
               Enable Notifications
             </Button>
           )}
         </Box>
-      )}
 
       <Typography variant="subtitle1" gutterBottom>
         Choose which notifications you want to receive:

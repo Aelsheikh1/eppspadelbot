@@ -225,6 +225,8 @@ const handleGameExpired = async (gameId) => {
 };
 
 export default function GameList() {
+
+
   const [games, setGames] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -776,16 +778,7 @@ export default function GameList() {
                           sx={{ mr: 1 }}
                         />
                       )}
-                      <Tooltip title="Game Actions" arrow>
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, game)}
-                          sx={{ ml: 1, flexShrink: 0 }}
-                          aria-label="Game actions menu"
-                        >
-                          <MoreVertIcon />
-                        </IconButton>
-                      </Tooltip>
+
                     </Box>
                   </Box>
                   <Grid container spacing={2}>

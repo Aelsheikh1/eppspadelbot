@@ -16,6 +16,7 @@ import NotificationSettings from './components/Notifications/NotificationSetting
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { requestFcmToken } from './services/firebase';
 
 
 
@@ -80,7 +81,7 @@ const NavbarWrapper = () => {
 
 function App() {
   useEffect(() => {
-
+    requestFcmToken();
   }, []);
   
   const triggerTestNotification = () => {

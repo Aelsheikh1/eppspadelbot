@@ -28,15 +28,16 @@ import {
   orderBy,
   addDoc
 } from 'firebase/firestore';
+import { getMessaging, getToken } from 'firebase/messaging';
 
 const firebaseConfig = {
-  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-  authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.REACT_APP_FIREBASE_APP_ID,
-  measurementId: process.env.REACT_APP_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
+  authDomain: "padelbolt-5d9a2.firebaseapp.com",
+  projectId: "padelbolt-5d9a2",
+  storageBucket: "padelbolt-5d9a2.firebasestorage.app",
+  messagingSenderId: "773090904452",
+  appId: "1:773090904452:web:e33380da424fe8d69e75d1",
+  measurementId: "G-1PRKH5C8NV"
 };
 
 const app = initializeApp(firebaseConfig);
@@ -658,6 +659,25 @@ export const getAllTournaments = async () => {
   } catch (error) {
     console.error('Error getting tournaments:', error);
     throw error;
+  }
+};
+
+// FCM: Request permission and get token
+export const requestFcmToken = async () => {
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      const messaging = getMessaging(app);
+      const token = await getToken(messaging, { vapidKey: 'BLF0nO_s9jj43GrZg9SgOnCtDYodczIJ8sL5Mx1vNl05RlToKnjrcQSVPip_lFc3CYipnzIjx0Q0r3FRw6vCa_s' });
+      console.log('FCM Token:', token);
+      return token;
+    } else {
+      console.warn('Notification permission not granted');
+      return null;
+    }
+  } catch (err) {
+    console.error('Error getting FCM token:', err);
+    return null;
   }
 };
 

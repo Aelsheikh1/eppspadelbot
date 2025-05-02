@@ -60,7 +60,13 @@ export const createUser = async (userData) => {
       email,
       name: name || 'User',
       role: role || 'user',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      notificationSettings: {
+        gameCreated: true,
+        gameClosingSoon: true,
+        gameClosed: true,
+        tournamentUpdates: true
+      }
     });
     return userRef.id;
   } catch (error) {
@@ -93,6 +99,12 @@ export const signInWithGoogle = async () => {
           ...userData,
           role: 'user',
           createdAt: new Date().toISOString(),
+          notificationSettings: {
+            gameCreated: true,
+            gameClosingSoon: true,
+            gameClosed: true,
+            tournamentUpdates: true
+          }
         });
       } else {
         await updateDoc(userRef, userData);
@@ -126,7 +138,13 @@ export const createUserWithEmail = async (email, password) => {
       lastName: '',
       role: 'user',
       createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString()
+      lastLogin: new Date().toISOString(),
+      notificationSettings: {
+        gameCreated: true,
+        gameClosingSoon: true,
+        gameClosed: true,
+        tournamentUpdates: true
+      }
     });
 
     return user;
@@ -157,7 +175,13 @@ export const signIn = async (email, password) => {
         lastName: '',
         role: 'user',
         createdAt: new Date().toISOString(),
-        lastLogin: new Date().toISOString()
+        lastLogin: new Date().toISOString(),
+        notificationSettings: {
+          gameCreated: true,
+          gameClosingSoon: true,
+          gameClosed: true,
+          tournamentUpdates: true
+        }
       });
     } else {
       await updateDoc(userRef, {
@@ -191,7 +215,13 @@ export const signInWithEmail = async (email, password) => {
         firstName: '',
         lastName: '',
         role: 'user',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        notificationSettings: {
+          gameCreated: true,
+          gameClosingSoon: true,
+          gameClosed: true,
+          tournamentUpdates: true
+        }
       });
     }
 

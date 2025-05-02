@@ -122,6 +122,10 @@ export default function Navbar() {
                 color: 'inherit',
                 textDecoration: 'none',
                 flexGrow: 1,
+                maxWidth: '350px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               EPPS PADELBOLT
@@ -177,7 +181,7 @@ export default function Navbar() {
             {/* Mobile Logo */}
             <TennisIcon sx={{ display: { xs: 'flex', md: 'none' }, mr: 1 }} />
             <Typography
-              variant="h5"
+              variant="h6"
               noWrap
               component="a"
               href="/"
@@ -187,9 +191,14 @@ export default function Navbar() {
                 flexGrow: 1,
                 fontFamily: 'monospace',
                 fontWeight: 700,
-                letterSpacing: '.3rem',
+                letterSpacing: '.2rem',
                 color: 'inherit',
                 textDecoration: 'none',
+                fontSize: { xs: '1.1rem', sm: '1.3rem' },
+                maxWidth: { xs: '60vw', sm: '80vw' },
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
               }}
             >
               EPPS PADELBOLT

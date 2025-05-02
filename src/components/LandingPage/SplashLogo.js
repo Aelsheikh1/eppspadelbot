@@ -5,8 +5,9 @@ import Box from '@mui/material/Box';
 const SplashLogo = ({ size = 88 }) => (
   <Box
     sx={{
-      width: size,
-      height: size,
+      width: { xs: '90vw', sm: size, md: size },
+      maxWidth: { xs: '90vw', sm: 300, md: 300 },
+      height: 'auto',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -18,9 +19,8 @@ const SplashLogo = ({ size = 88 }) => (
     <img
       src={process.env.PUBLIC_URL + '/web-app-manifest-512x512.png'}
       alt="EPPS Logo"
-      width={size}
-      height={size}
-      style={{ objectFit: 'contain', borderRadius: 16, boxShadow: '0 2px 8px rgba(25, 118, 210, 0.13)' }}
+      className="splash-logo"
+      style={{ width: '100%', height: 'auto', objectFit: 'contain', borderRadius: 16, boxShadow: '0 2px 8px rgba(25, 118, 210, 0.13)' }}
     />
   </Box>
 );

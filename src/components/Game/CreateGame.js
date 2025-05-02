@@ -13,10 +13,66 @@ import {
   Paper,
   Alert,
 } from '@mui/material';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+
+/**
+ * Send game created notifications to all users
+ * @param {string} gameId - ID of the newly created game
+ * @param {Object} gameData - Details of the created game
+ */
+const sendGameCreatedNotifications = async (gameId, gameData) => {
+  try {
+    // Fetch all users who want game created notifications
+    const usersRef = collection(db, 'users');
+    const usersQuery = query(
+      usersRef, 
+      where('notificationSettings.gameCreated', '!=', false)
+    );
+    const usersSnapshot = await getDocs(usersQuery);
+
+    // Create notifications for each user
+    const notificationsRef = collection(db, 'notifications');
+    const notificationPromises = usersSnapshot.docs.map(async (userDoc) => {
+      const userData = userDoc.data();
+      const userId = userDoc.id;
+
+      // Create notification document
+      await addDoc(notificationsRef, {
+        userId,
+        title: 'New Game Created',
+        body: `A new game has been created at ${gameData.location} on ${gameData.date} at ${gameData.time}`,
+        type: 'gameCreated',
+        data: {
+          gameId,
+          location: gameData.location,
+          date: gameData.date,
+          time: gameData.time
+        },
+        read: false,
+        createdAt: new Date()
+      });
+
+      // Optional: Send web push notification if supported
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('New Game Created', {
+          body: `A new game has been created at ${gameData.location} on ${gameData.date} at ${gameData.time}`,
+          icon: '/logo192.png',
+          data: { gameId }
+        });
+      }
+    });
+
+    // Wait for all notifications to be created
+    await Promise.all(notificationPromises);
+
+    console.log(`Sent game created notifications for game ${gameId}`);
+  } catch (error) {
+    console.error('Error sending game created notifications:', error);
+  }
+};
 
 export default function CreateGame() {
   const navigate = useNavigate();
@@ -69,7 +125,12 @@ export default function CreateGame() {
         }
       };
 
-      await addDoc(collection(db, 'games'), gameData);
+      // Add the game to Firestore
+      const gameDocRef = await addDoc(collection(db, 'games'), gameData);
+      
+      // Send notifications to all users
+      await sendGameCreatedNotifications(gameDocRef.id, gameData);
+      
       navigate('/admin/games');
     } catch (err) {
       console.error('Error creating game:', err);

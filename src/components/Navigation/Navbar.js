@@ -82,7 +82,7 @@ export default function Navbar() {
       show: true
     },
     {
-      text: 'Notifications',
+      text: 'Notifications Settings',
       icon: <NotificationsIcon />,
       path: '/notifications',
       show: true

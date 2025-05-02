@@ -1,0 +1,71 @@
+Git Workflow for Project Updates
+
+Basic Git Commands
+
+1. Check Current Status
+Command: git status
+Purpose: Shows which files have been modified, staged, or are untracked
+Helps you understand the current state of your repository
+
+2. Add Changes to Staging
+Commands: 
+- Add specific files: 
+  git add src/components/NotificationBell.js src/utils/gameNotifications.js
+- Add all changed files: 
+  git add .
+Purpose: Prepares files to be committed
+Allows you to select which changes you want to include in the commit
+
+3. Commit Changes
+Command: git commit -m "Descriptive commit message explaining the changes"
+Purpose: Creates a snapshot of your changes
+Always use a clear, concise message describing what was modified
+
+4. Push Changes to Remote Repository
+Commands: 
+- Push to master branch: 
+  git push origin master
+- Push to a different branch: 
+  git push origin branch_name
+Purpose: Uploads your local commits to the remote repository on GitHub
+
+5. Pull Latest Changes
+Command: git pull origin master
+Purpose: Downloads and merges the latest changes from the remote repository
+Always pull before starting new work to avoid conflicts
+
+6. Create a New Branch
+Command: git checkout -b new_feature_branch
+Purpose: Creates and switches to a new branch for developing features
+
+7. Switch Between Branches
+Commands: 
+- Switch to master: 
+  git checkout master
+- Switch to another branch: 
+  git checkout new_feature_branch
+Purpose: Allows you to move between different branches
+
+Troubleshooting
+
+Undo Last Commit (Local Only)
+Commands:
+- Undo commit but keep changes: 
+  git reset HEAD~1
+- Undo commit and discard changes: 
+  git reset --hard HEAD~1
+
+View Commit History
+Command: git log
+
+Best Practices
+- Always pull before you start working
+- Create a new branch for each feature
+- Write clear, descriptive commit messages
+- Review changes before committing
+
+Quick Reference for Your Project
+1. Check status: git status
+2. Add files: git add .
+3. Commit changes: git commit -m "Your description"
+4. Push to master: git push origin master

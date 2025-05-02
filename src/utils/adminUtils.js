@@ -1,5 +1,12 @@
 import { db } from '../services/firebase';
-import { doc, getDoc, updateDoc, collection, getDocs } from 'firebase/firestore';
+import { 
+  doc, 
+  getDoc, 
+  updateDoc,
+  collection,
+  addDoc
+} from 'firebase/firestore';
+import { sendGameNotification } from './gameNotifications';
 import { emailGameReport } from './pdfGenerator';
 // TODO: Implement notification sending via OneSignal in the future.
 
@@ -189,6 +196,29 @@ export const addPlayerToGame = async (gameId, playerId) => {
       players: updatedPlayers,
       lastUpdated: new Date().toISOString()
     });
+
+    // Send game registration confirmation notification
+    await sendGameNotification('gameConfirmation', {
+      id: gameId,
+      location: gameData.location,
+      date: gameData.date,
+      time: gameData.time
+    }, [playerId]);
+
+    // Check if game is now full and send a notification
+    if (updatedPlayers.length >= gameData.maxPlayers) {
+      await updateDoc(gameRef, {
+        isOpen: false,
+        status: 'closed'
+      });
+      
+      // Send game closed notification to all registered players
+      await sendGameNotification('gameClosed', {
+        id: gameId,
+        location: gameData.location,
+        date: gameData.date
+      }, updatedPlayers);
+    }
 
     return true;
   } catch (error) {

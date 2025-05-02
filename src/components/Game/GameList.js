@@ -622,21 +622,20 @@ export default function GameList() {
             exclusive
             onChange={(e, val) => setShowOpenOnly(val === 'open')}
             sx={{
-              background: '#f5f6fa',
-              borderRadius: 2,
-              boxShadow: 1,
-              p: 0.5,
+              display: 'flex',
+              gap: 1,
               '.MuiToggleButton-root': {
+                textTransform: 'none',
                 fontWeight: 600,
                 fontSize: '0.95rem',
                 px: 2,
                 py: 1,
-                border: 'none',
-                color: '#888',
+                border: '1px solid #1976d2',
+                borderRadius: '50px',
+                color: '#1976d2',
                 '&.Mui-selected': {
-                  background: 'linear-gradient(90deg, #1976d2 0%, #21cbf3 100%)',
-                  color: '#fff',
-                  boxShadow: '0 2px 8px #1976d233',
+                  backgroundColor: '#1976d2',
+                  color: '#fff'
                 }
               }
             }}

@@ -1,6 +1,6 @@
 import { getMessaging } from 'firebase/messaging';
 import { db } from '../services/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 
 /**
@@ -84,7 +84,19 @@ export const testNotification = async (type = 'gameCreated') => {
         this.close();
       };
       
-      console.log('Test notification sent:', { title, body, data });
+      // Store notification in Firestore
+      const notificationsRef = collection(db, 'notifications');
+      await addDoc(notificationsRef, {
+        userId: user.uid,
+        title,
+        body,
+        type: data.type,
+        data,
+        read: false,
+        createdAt: new Date()
+      });
+
+      console.log('Test notification sent and stored:', { title, body, data });
       return true;
     } else {
       console.error('Notifications not supported or permission not granted.');

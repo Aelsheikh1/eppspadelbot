@@ -1,8 +1,18 @@
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.0/firebase-messaging.js');
 
-let app;
-let messaging;
+const firebaseConfig = {
+  apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
+  authDomain: "padelbolt-5d9a2.firebaseapp.com",
+  projectId: "padelbolt-5d9a2",
+  storageBucket: "padelbolt-5d9a2.firebasestorage.app",
+  messagingSenderId: "773090904452",
+  appId: "1:773090904452:web:e33380da424fe8d69e75d1",
+  measurementId: "G-1PRKH5C8NV"
+};
+
+firebase.initializeApp(firebaseConfig);
+const messaging = firebase.messaging();
 
 // Listen for messages from the main thread
 self.addEventListener('message', (event) => {

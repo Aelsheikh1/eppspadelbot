@@ -92,24 +92,6 @@ export const sendGameNotification = async (type, gameData, specificUserIds = nul
         read: false,
         createdAt: serverTimestamp()
       });
-
-      // Optional: Send web push notification if supported
-      if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification(notificationDetails.title, {
-          body: notificationDetails.body,
-          icon: '/logo192.png',
-          data: { 
-            gameId,
-            link: gameLink, // Consistent link in notification data
-            gameDetails: gameData // Include full game details
-          }
-        });
-        
-        // Add click event to open game details
-        notification.onclick = () => {
-          window.location.href = gameLink; // Use location.href for navigation
-        };
-      }
     });
 
     // Wait for all notifications to be created

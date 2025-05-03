@@ -131,7 +131,7 @@ export default function LandingPage() {
                     pr: 0,
                   }}
                 >
-                  PadelBolt
+                  
                 </Typography>
               </Box>
 

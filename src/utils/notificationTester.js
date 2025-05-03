@@ -6,6 +6,7 @@ import { getAuth } from 'firebase/auth';
 /**
  * Utility for testing push notifications locally
  */
+// NOTE: This file is for local development/testing only. Do not use in production builds.
 export const testNotification = async (type = 'gameCreated') => {
   try {
     // Get current user

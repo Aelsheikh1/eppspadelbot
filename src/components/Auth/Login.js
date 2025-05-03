@@ -118,102 +118,83 @@ export default function Login() {
   }
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <StyledPaper elevation={3}>
-          <Typography 
-            component="h1" 
-            variant="h4" 
-            align="center" 
-            gutterBottom
-            sx={{ 
-              fontWeight: 700,
-              color: '#1a73e8',
-              mb: 3
-            }}
-          >
-            Welcome to PadelBolt
-          </Typography>
-          
-          {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
-          <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="email"
-              label="Email Address"
-              name="email"
-              autoComplete="email"
-              autoFocus
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              InputProps={{
-                startAdornment: <EmailIcon color="action" sx={{ mr: 1 }} />,
-              }}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              InputProps={{
-                startAdornment: <LockIcon color="action" sx={{ mr: 1 }} />,
-              }}
-            />
-            <LoginButton
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2 }}
-              disabled={loading}
-            >
-              Sign In with Email
-            </LoginButton>
-          </Box>
-
-          <Divider sx={{ my: 3 }}>OR</Divider>
-
-          <GoogleButton
+    <Container maxWidth="sm">
+      <StyledPaper elevation={3}>
+        <img
+          src="/logo192.png"
+          alt="Logo"
+          style={{ display: 'block', margin: '24px auto 16px auto', width: '24px', height: '24px' }}
+        />
+        {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        <Box component="form" onSubmit={handleSubmit} noValidate sx={{ mt: 1 }}>
+          <TextField
+            margin="normal"
+            required
             fullWidth
-            startIcon={<GoogleIcon />}
-            onClick={handleGoogleSignIn}
+            id="email"
+            label="Email Address"
+            name="email"
+            autoComplete="email"
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            InputProps={{
+              startAdornment: <EmailIcon color="action" sx={{ mr: 1 }} />,
+            }}
+          />
+          <TextField
+            margin="normal"
+            required
+            fullWidth
+            name="password"
+            label="Password"
+            type="password"
+            id="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            InputProps={{
+              startAdornment: <LockIcon color="action" sx={{ mr: 1 }} />,
+            }}
+          />
+          <LoginButton
+            type="submit"
+            fullWidth
+            variant="contained"
+            sx={{ mt: 3, mb: 2 }}
             disabled={loading}
           >
-            Continue with Google
-          </GoogleButton>
+            Sign In with Email
+          </LoginButton>
+        </Box>
 
-          <Box sx={{ mt: 2, textAlign: 'center' }}>
-            <Link 
-              href="/register" 
-              variant="body2"
-              sx={{ 
-                color: '#1a73e8',
-                textDecoration: 'none',
-                '&:hover': {
-                  textDecoration: 'underline',
-                }
-              }}
-            >
-              {"Don't have an account? Sign Up"}
-            </Link>
-          </Box>
-        </StyledPaper>
-      </Box>
+        <Divider sx={{ my: 3 }}>OR</Divider>
+
+        <GoogleButton
+          fullWidth
+          startIcon={<GoogleIcon />}
+          onClick={handleGoogleSignIn}
+          disabled={loading}
+        >
+          Continue with Google
+        </GoogleButton>
+
+        <Box sx={{ mt: 2, textAlign: 'center' }}>
+          <Link 
+            href="/register" 
+            variant="body2"
+            sx={{ 
+              color: '#1a73e8',
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'underline',
+              }
+            }}
+          >
+            {"Don't have an account? Sign Up"}
+          </Link>
+        </Box>
+      </StyledPaper>
     </Container>
   );
 }

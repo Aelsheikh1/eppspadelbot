@@ -20,7 +20,7 @@ const SplashLogo = ({ size = 88 }) => (
       src={process.env.PUBLIC_URL + '/web-app-manifest-512x512.png'}
       alt="EPPS Logo"
       className="splash-logo"
-      style={{ width: '100%', height: 'auto', objectFit: 'contain', borderRadius: 16, boxShadow: '0 2px 8px rgba(25, 118, 210, 0.13)' }}
+      style={{ width: '50%', height: 'auto', objectFit: 'contain', borderRadius: 16, boxShadow: '0 2px 8px rgba(25, 118, 210, 0.13)' }}
     />
   </Box>
 );

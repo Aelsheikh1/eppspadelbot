@@ -203,10 +203,6 @@ messaging.onBackgroundMessage(async (payload) => {
     console.error('[Service Worker] Error showing notification:', error);
   }
 });
-  } catch (error) {
-    console.error('[Service Worker] Error showing notification:', error);
-  }
-});
 
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {

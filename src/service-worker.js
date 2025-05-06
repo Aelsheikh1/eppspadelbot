@@ -2,12 +2,6 @@
 /* global importScripts, firebase, clients */
 /* eslint-disable no-restricted-globals */
 
-// This service worker can be customized!
-let currentToken = null;
-// See https://developers.google.com/web/tools/workbox/modules
-// for the list of available Workbox modules, or add any other
-// code you'd like.
-
 import { clientsClaim } from 'workbox-core';
 import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
@@ -17,6 +11,12 @@ import { StaleWhileRevalidate } from 'workbox-strategies';
 // Import Firebase messaging for background notifications
 importScripts('https://www.gstatic.com/firebasejs/10.7.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.7.2/firebase-messaging-compat.js');
+
+// This service worker can be customized!
+let currentToken = null;
+// See https://developers.google.com/web/tools/workbox/modules
+// for the list of available Workbox modules, or add any other
+// code you'd like.
 
 clientsClaim();
 

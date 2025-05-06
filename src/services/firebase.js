@@ -28,7 +28,7 @@ import {
   orderBy,
   addDoc
 } from 'firebase/firestore';
-import { getMessaging, getToken } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
@@ -695,16 +695,97 @@ export const getAllTournaments = async () => {
 // FCM: Request permission and get token
 export const requestFcmToken = async () => {
   try {
+    // Check if notifications are supported
+    if (!('Notification' in window)) {
+      console.error('Notifications are not supported in this browser');
+      return null;
+    }
+
+    // Request permission
     const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      const messaging = getMessaging(app);
-      const token = await getToken(messaging, { vapidKey: 'BLF0nO_s9jj43GrZg9SgOnCtDYodczIJ8sL5Mx1vNl05RlToKnjrcQSVPip_lFc3CYipnzIjx0Q0r3FRw6vCa_s' });
-      console.log('FCM Token:', token);
-      return token;
-    } else {
+    if (permission !== 'granted') {
       console.warn('Notification permission not granted');
       return null;
     }
+
+    // Get service worker registration
+    const registration = await navigator.serviceWorker.ready;
+    if (!registration) {
+      console.error('Service Worker not registered');
+      return null;
+    }
+
+    // Initialize Firebase Messaging
+    const messaging = getMessaging(app);
+
+    // Subscribe to messages
+    await messaging.getToken({
+      vapidKey: 'BLF0nO_s9jj43GrZg9SgOnCtDYodczIJ8sL5Mx1vNl05RlToKnjrcQSVPip_lFc3CYipnzIjx0Q0r3FRw6vCa_s'
+    });
+
+    // Get the token
+    const token = await getToken(messaging, {
+      vapidKey: 'BLF0nO_s9jj43GrZg9SgOnCtDYodczIJ8sL5Mx1vNl05RlToKnjrcQSVPip_lFc3CYipnzIjx0Q0r3FRw6vCa_s'
+    });
+
+    if (!token) {
+      console.error('Failed to get FCM token');
+      return null;
+    }
+
+    console.log('FCM Token:', token);
+
+    // Send token to service worker
+    registration.active.postMessage({
+      type: 'UPDATE_FCM_TOKEN',
+      token: token
+    });
+
+    // Setup foreground message handler
+    onMessage(messaging, (payload) => {
+      console.log('Received foreground message:', payload);
+      
+      // Get unique notification ID
+      const notificationId = `notification-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+      
+      // Close any existing notifications
+      const existingNotifications = Array.from(document.getElementsByTagName('notification'));
+      existingNotifications.forEach(n => n.close());
+
+      // Show new notification
+      const notification = new Notification(payload.notification.title, {
+        body: payload.notification.body,
+        icon: '/favicon-96x96.png',
+        badge: '/favicon-96x96.png',
+        data: {
+          ...payload.data,
+          notificationId
+        },
+        tag: notificationId,
+        requireInteraction: true
+      });
+
+      // Close notification after 5 seconds if not interacted with
+      setTimeout(() => {
+        if (!notification.closed) {
+          notification.close();
+        }
+      }, 5000);
+
+      // Handle notification click
+      notification.onclick = () => {
+        console.log('Notification clicked');
+        notification.close();
+        window.focus();
+      };
+
+      // Handle notification close
+      notification.onclose = () => {
+        console.log('Notification closed');
+      };
+    });
+
+    return token;
   } catch (err) {
     console.error('Error getting FCM token:', err);
     return null;

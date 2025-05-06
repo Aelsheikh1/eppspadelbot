@@ -1,4 +1,4 @@
-import { getMessaging } from 'firebase/messaging';
+
 import { db } from '../services/firebase';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -85,17 +85,23 @@ export const testNotification = async (type = 'gameCreated') => {
         this.close();
       };
       
-      // Store notification in Firestore
+      // Store notification in Firestore with unique ID
       const notificationsRef = collection(db, 'notifications');
-      await addDoc(notificationsRef, {
+      const notificationData = {
         userId: user.uid,
         title,
         body,
         type: data.type,
         data,
         read: false,
-        createdAt: new Date()
-      });
+        createdAt: new Date(),
+        notificationId: `notification-${Date.now()}-${Math.random().toString(36).substring(2)}`
+      };
+
+      // Add notificationId to the data payload
+      data.notificationId = notificationData.notificationId;
+
+      await addDoc(notificationsRef, notificationData);
 
       console.log('Test notification sent and stored:', { title, body, data });
       return true;

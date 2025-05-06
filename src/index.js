@@ -3,148 +3,78 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
-import OneSignal from 'react-onesignal';
+import { getMessaging } from 'firebase/messaging';
+import { initializeApp } from 'firebase/app';
+import { requestFcmToken } from './services/firebase';
+import { auth, db } from './services/firebase';
 
-const oneSignalInit = async () => {
+// Initialize Firebase app
+const firebaseConfig = {
+  apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
+  authDomain: "padelbolt-5d9a2.firebaseapp.com",
+  projectId: "padelbolt-5d9a2",
+  storageBucket: "padelbolt-5d9a2.firebasestorage.app",
+  messagingSenderId: "773090904452",
+  appId: "1:773090904452:web:e33380da424fe8d69e75d1",
+  measurementId: "G-1PRKH5C8NV"
+};
+
+const app = initializeApp(firebaseConfig);
+
+let isNotificationInitialized = false;
+
+const initializeNotifications = async () => {
   try {
-    // Detailed browser and environment checks
-    console.group('🔍 OneSignal Pre-Initialization Checks');
-    console.log('Window Object:', typeof window !== 'undefined');
-    console.log('Navigator Object:', window.navigator ? 'Available' : 'Unavailable');
-    console.log('Secure Context:', window.isSecureContext);
-    console.log('Hostname:', window.location.hostname);
-    console.log('Notification Support:', 'Notification' in window);
-    console.groupEnd();
+    if (isNotificationInitialized) return;
 
-    // Check browser support
-    if (typeof window === 'undefined' || !window.navigator) {
-      console.error('🚫 Browser environment not supported');
-      return;
-    }
+    // Register service worker for notifications
+    if ('serviceWorker' in navigator) {
+      try {
+        // First, wait for service worker to be ready
+        const registration = await navigator.serviceWorker.ready;
+        console.log('✅ Service Worker ready:', registration);
 
-    // Ensure secure context
-    if (!window.isSecureContext && !window.location.hostname.includes('localhost')) {
-      console.warn('🔒 Not in a secure context. Notifications may not work.');
-      return;
-    }
+        // Send Firebase config to service worker
+        registration.active.postMessage({
+          type: 'FIREBASE_CONFIG',
+          config: firebaseConfig
+        });
 
-    // Check if browser supports notifications
-    if (!('Notification' in window)) {
-      console.error('🚫 Browser does not support desktop notifications');
-      return;
-    }
+        // Initialize Firebase Messaging
+        const messaging = getMessaging(app);
 
-    // Log OneSignal initialization details
-    console.log('🔔 OneSignal App ID:', process.env.REACT_APP_ONESIGNAL_APP_ID || "6c89c857-e106-437a-b445-7150edf7cf22");
+        // Request permission and get FCM token
+        const token = await requestFcmToken();
+        if (token) {
+          console.log('✅ FCM Token obtained:', token);
+          // Store the token in localStorage
+          localStorage.setItem('fcmToken', token);
 
-    await OneSignal.init({
-      appId: process.env.REACT_APP_ONESIGNAL_APP_ID || "6c89c857-e106-437a-b445-7150edf7cf22",
-      allowLocalhostAsSecureOrigin: true,
-      notifyButton: { enable: true },
-      autoRegister: true,
-      welcomeNotification: {
-        title: "Padel Tournament Notifications",
-        message: "You'll now receive game updates!"
-      },
-      promptOptions: {
-        slidedown: {
-          enabled: true,
-          autoPrompt: true,
-          actionMessage: 'Enable notifications for game updates',
-          acceptButtonText: 'Allow',
-          cancelButtonText: 'Not Now'
+          // Send token to service worker
+          registration.active.postMessage({
+            type: 'UPDATE_FCM_TOKEN',
+            token: token
+          });
+        } else {
+          console.warn('⚠️ Notification permission not granted');
         }
+      } catch (error) {
+        console.error('❌ Error registering service worker:', error);
+        throw error; // Re-throw to be caught by the outer try-catch
       }
-    });
-
-    console.group('🔔 [OneSignal] Comprehensive Initialization');
-    console.log('✅ OneSignal Initialized Successfully');
-
-    // Comprehensive event listeners
-    OneSignal.Notifications.addEventListener('permissionChange', async (permission) => {
-      console.log('🔄 Permission Status Changed:', permission);
-      
-      // Log detailed permission information
-      const currentPermission = await OneSignal.Notifications.permission;
-      console.log('📋 Current Permission Details:', {
-        status: currentPermission,
-        isSupported: OneSignal.Notifications.supportsPermissionRequest(),
-        isPushSupported: OneSignal.Notifications.isPushSupported()
-      });
-    });
-
-    OneSignal.Notifications.addEventListener('click', (event) => {
-      console.log('🖱️ Notification Clicked:', event);
-    });
-
-    OneSignal.Notifications.addEventListener('foregroundWillDisplay', (event) => {
-      console.log('📢 Notification Will Display:', event);
-    });
-
-    // Explicit permission request
-    try {
-      // Basic permission check and request
-      console.log('🔍 Checking Notification Permissions');
-
-      // Check if notifications are supported
-      if (!('Notification' in window)) {
-        console.error('🚫 Notifications not supported in this browser');
-        return;
-      }
-
-      // Get current permission status
-      const currentPermission = Notification.permission;
-      console.log('📋 Current Permission Status:', currentPermission);
-
-      // Request permission if not already granted
-      if (currentPermission !== 'granted') {
-        console.warn('⚠️ Notification Permission Not Granted. Requesting...');
-        
-        try {
-          const newPermission = await Notification.requestPermission();
-          console.log('🎉 New Permission Status:', newPermission);
-
-          if (newPermission === 'granted') {
-            console.log('✅ Notifications Enabled Successfully');
-          } else {
-            console.warn('⚠️ Notification Permission Denied or Dismissed');
-          }
-        } catch (permissionError) {
-          console.error('🚫 Permission Request Error:', permissionError);
-        }
-      } else {
-        console.log('✅ Notifications Already Permitted');
-      }
-    } catch (error) {
-      console.group('🚨 Notification Permission Error');
-      console.error('Error Details:', error);
-      console.error('Error Name:', error.name);
-      console.error('Error Message:', error.message);
-      console.groupEnd();
+    } else {
+      console.warn('⚠️ Service Worker not supported in this browser');
     }
 
-    console.groupEnd();
+    // Set flag to prevent re-initialization
+    isNotificationInitialized = true;
   } catch (error) {
-    console.group('🚨 [OneSignal] Initialization Error');
-    console.error('Detailed Error:', error);
-    console.error('Error Name:', error.name);
-    console.error('Error Message:', error.message);
-    console.error('Error Stack:', error.stack);
-    console.groupEnd();
+    console.error('❌ Error initializing notifications:', error);
   }
 };
 
-oneSignalInit();
-
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/firebase-messaging-sw.js')
-    .then(reg => {
-      console.log('✅ FCM Service Worker registered:', reg);
-    })
-    .catch(err => {
-      console.error('❌ FCM Service Worker registration failed:', err);
-    });
-}
+// Initialize notifications
+initializeNotifications();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(

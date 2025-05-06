@@ -305,35 +305,33 @@ export default function NotificationBell() {
         }}
       >
         {/* Action buttons at the top of menu */}
-        {notifications.length > 0 && (
-          <>
-            <Box sx={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              padding: '8px 16px', 
-              borderBottom: '1px solid rgba(0, 0, 0, 0.12)' 
-            }}>
-              <Tooltip title="Mark all as read">
-                <IconButton 
-                  size="small" 
-                  onClick={handleMarkAllAsRead}
-                  disabled={notifications.every(n => n.read)}
-                >
-                  <DoneAllIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-              
-              <Tooltip title="Delete all notifications">
-                <IconButton 
-                  size="small" 
-                  onClick={handleDeleteAllNotifications}
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Tooltip>
-            </Box>
-          </>
-        )}
+        {notifications.length > 0 && [
+          <Box key="action-buttons" sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            padding: '8px 16px', 
+            borderBottom: '1px solid rgba(0, 0, 0, 0.12)' 
+          }}>
+            <Tooltip title="Mark all as read">
+              <IconButton 
+                size="small" 
+                onClick={handleMarkAllAsRead}
+                disabled={notifications.every(n => n.read)}
+              >
+                <DoneAllIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            
+            <Tooltip title="Delete all notifications">
+              <IconButton 
+                size="small" 
+                onClick={handleDeleteAllNotifications}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ]}
         
         {/* Notification list */}
         {notifications.length === 0 ? (

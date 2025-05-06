@@ -14,8 +14,8 @@ import { registerRoute } from 'workbox-routing';
 import { StaleWhileRevalidate } from 'workbox-strategies';
 
 // Import Firebase messaging for background notifications
-importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.6.1/firebase-messaging-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.2/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.7.2/firebase-messaging-compat.js');
 
 clientsClaim();
 
@@ -74,6 +74,45 @@ self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
+
+  if (event.data && event.data.type === 'UPDATE_FCM_TOKEN') {
+    console.log('[Service Worker] Received new FCM token:', event.data.token);
+    currentToken = event.data.token;
+  }
+
+  if (event.data && event.data.type === 'FIREBASE_CONFIG') {
+    console.log('[Service Worker] Received Firebase config');
+    self.FIREBASE_CONFIG = event.data.config;
+    
+    // Reinitialize Firebase with new config
+    firebase.initializeApp(self.FIREBASE_CONFIG);
+    const messaging = firebase.messaging();
+    
+    // Reattach background message handler
+    messaging.onBackgroundMessage((payload) => {
+      console.log('[Service Worker] Received background message:', payload);
+      
+      try {
+        const notificationTitle = payload.notification.title;
+        const notificationOptions = {
+          body: payload.notification.body,
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          data: payload.data,
+          actions: [
+            {
+              action: 'view',
+              title: 'View'
+            }
+          ]
+        };
+
+        self.registration.showNotification(notificationTitle, notificationOptions);
+      } catch (error) {
+        console.error('[Service Worker] Error showing notification:', error);
+      }
+    });
+  }
 });
 
 // Firebase messaging configuration
@@ -89,82 +128,143 @@ firebase.initializeApp({
 const messaging = firebase.messaging();
 
 // Handle background messages
-messaging.onBackgroundMessage((payload) => {
+messaging.onBackgroundMessage(async (payload) => {
   console.log('[Service Worker] Received background message:', payload);
   
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
-    body: payload.notification.body,
-    icon: '/logo192.png',
-    badge: '/logo192.png',
-    data: payload.data,
-    actions: [
-      {
-        action: 'view',
-        title: 'View'
+  try {
+    const notificationTitle = payload.notification.title;
+    const notificationOptions = {
+      body: payload.notification.body,
+      icon: '/favicon-96x96.png',
+      badge: '/favicon-96x96.png',
+      data: payload.data,
+      actions: [
+        {
+          action: 'view',
+          title: 'View'
+        }
+      ],
+      tag: payload.data?.notificationId || 'default-notification',
+      requireInteraction: true
+    };
+
+    // Get all active notifications
+    const activeNotifications = await self.registration.getNotifications();
+    
+    // Close all notifications with the same tag
+    activeNotifications.forEach(notification => {
+      if (notification.tag === notificationOptions.tag) {
+        notification.close();
       }
-    ]
-  };
-  
-  self.registration.showNotification(notificationTitle, notificationOptions);
+    });
+
+    // Show the new notification
+    const notification = await self.registration.showNotification(notificationTitle, notificationOptions);
+
+    // Add a timer to close the notification if not interacted with
+    setTimeout(() => {
+      if (notification && !notification.closed) {
+        notification.close();
+      }
+    }, 5000);
+
+    // Add click handler
+    notification.onclick = async () => {
+      console.log('[Service Worker] Notification clicked');
+      
+      try {
+        // Close the notification
+        notification.close();
+
+        // Find and focus existing window
+        const clients = await self.clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        });
+
+        const client = clients.find(c => c.url.startsWith(self.location.origin));
+        
+        if (client) {
+          await client.focus();
+        } else {
+          // Open new window if no existing one
+          await self.clients.openWindow('/');
+        }
+      } catch (error) {
+        console.error('[Service Worker] Error handling notification click:', error);
+      }
+    };
+
+    // Add close handler
+    notification.onclose = () => {
+      console.log('[Service Worker] Notification closed');
+    };
+  } catch (error) {
+    console.error('[Service Worker] Error showing notification:', error);
+  }
+});
+  } catch (error) {
+    console.error('[Service Worker] Error showing notification:', error);
+  }
 });
 
 // Handle notification click
 self.addEventListener('notificationclick', (event) => {
   console.log('[Service Worker] Notification click:', event);
   
-  event.notification.close();
-  
-  // Handle click action
-  if (event.action === 'view' && event.notification.data) {
-    const gameId = event.notification.data.gameId;
-    if (gameId) {
-      // Open the game details page
-      const urlToOpen = new URL(`/games/${gameId}`, self.location.origin).href;
-      
+  try {
+    event.notification.close();
+    
+    if (event.action === 'view' && event.notification.data) {
+      const gameId = event.notification.data.gameId;
+      if (gameId) {
+        // Open the game details page
+        const urlToOpen = new URL(`/games/${gameId}`, self.location.origin).href;
+        
+        const promiseChain = clients.matchAll({
+          type: 'window',
+          includeUncontrolled: true
+        }).then((windowClients) => {
+          // Check if there is already a window/tab open with the target URL
+          let matchingClient = null;
+          
+          for (let i = 0; i < windowClients.length; i++) {
+            const windowClient = windowClients[i];
+            // Check if the URL of the window includes our target URL
+            if (windowClient.url.includes(gameId)) {
+              matchingClient = windowClient;
+              break;
+            }
+          }
+          
+          // If a matching window is found, focus it
+          if (matchingClient) {
+            return matchingClient.focus();
+          } else {
+            // If no matching window is found, open a new one
+            return clients.openWindow(urlToOpen);
+          }
+        });
+        
+        event.waitUntil(promiseChain);
+      }
+    } else {
+      // Default behavior - open the app
       const promiseChain = clients.matchAll({
         type: 'window',
         includeUncontrolled: true
-      })
-      .then((windowClients) => {
-        // Check if there is already a window/tab open with the target URL
-        let matchingClient = null;
-        
-        for (let i = 0; i < windowClients.length; i++) {
-          const windowClient = windowClients[i];
-          // Check if the URL of the window includes our target URL
-          if (windowClient.url.includes(gameId)) {
-            matchingClient = windowClient;
-            break;
-          }
-        }
-        
-        // If a matching window is found, focus it
-        if (matchingClient) {
-          return matchingClient.focus();
+      }).then((windowClients) => {
+        if (windowClients.length > 0) {
+          return windowClients[0].focus();
         } else {
-          // If no matching window is found, open a new one
-          return clients.openWindow(urlToOpen);
+          return clients.openWindow('/');
         }
       });
       
       event.waitUntil(promiseChain);
     }
-  } else {
-    // Default behavior - open the app
-    const promiseChain = clients.matchAll({
-      type: 'window',
-      includeUncontrolled: true
-    })
-    .then((windowClients) => {
-      if (windowClients.length > 0) {
-        return windowClients[0].focus();
-      } else {
-        return clients.openWindow('/');
-      }
-    });
-    
-    event.waitUntil(promiseChain);
+  } catch (error) {
+    console.error('[Service Worker] Error in notification click handler:', error);
   }
 });
 

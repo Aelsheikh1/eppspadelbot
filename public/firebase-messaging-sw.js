@@ -18,15 +18,18 @@ self.addEventListener('install', (event) => {
   }
 
   try {
-    app = firebase.initializeApp({
-      apiKey: "${process.env.REACT_APP_FIREBASE_API_KEY}",
-      authDomain: "${process.env.REACT_APP_FIREBASE_AUTH_DOMAIN}",
-      projectId: "${process.env.REACT_APP_FIREBASE_PROJECT_ID}",
-      storageBucket: "${process.env.REACT_APP_FIREBASE_STORAGE_BUCKET}",
-      messagingSenderId: "${process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID}",
-      appId: "${process.env.REACT_APP_FIREBASE_APP_ID}",
-      measurementId: "${process.env.REACT_APP_FIREBASE_MEASUREMENT_ID}"
-    });
+    // Get Firebase config from main thread
+    const firebaseConfig = {
+      apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
+      authDomain: "padelbolt-5d9a2.firebaseapp.com",
+      projectId: "padelbolt-5d9a2",
+      storageBucket: "padelbolt-5d9a2.firebasestorage.app",
+      messagingSenderId: "773090904452",
+      appId: "1:773090904452:web:e33380da424fe8d69e75d1",
+      measurementId: "G-1PRKH5C8NV"
+    };
+
+    app = firebase.initializeApp(firebaseConfig);
     messaging = firebase.messaging(app);
     
     // Set up background message handler
@@ -102,18 +105,16 @@ const handleNotification = async (payload) => {
     const notificationTitle = payload.notification.title || 'New Game Available!';
     const notificationBody = payload.notification.body || 'A new game has been created!';
     const notificationData = payload.data || {};
-    const gameUrl = notificationData.url || 'https://eppspadelbot.vercel.app/games';
+    const gameUrl = notificationData.url || '/games'; // Relative path for better compatibility
 
     // Generate a unique tag based on notification type and data
-    const notificationTag = `notification-${payload.notification.type || 'default'}-${notificationData.gameId || 'default'}`;
+    const notificationTag = `notification-${payload.notification.type || 'default'}-${notificationData.gameId || 'default'}-${Date.now()}`;
 
-    // Check if notification with this tag already exists
-    const existingNotifications = await self.registration.getNotifications({ tag: notificationTag });
-    if (existingNotifications.length > 0) {
-      // Update existing notification instead of creating a new one
-      existingNotifications[0].close();
-    }
+    // Close all existing notifications
+    const existingNotifications = await self.registration.getNotifications();
+    existingNotifications.forEach(notification => notification.close());
 
+    // Create notification options
     const notificationOptions = {
       body: notificationBody,
       icon: '/logo192.png',
@@ -128,10 +129,6 @@ const handleNotification = async (payload) => {
         {
           action: 'open',
           title: 'View Game'
-        },
-        {
-          action: 'close',
-          title: 'Dismiss'
         }
       ],
       requireInteraction: true,
@@ -140,7 +137,58 @@ const handleNotification = async (payload) => {
       silent: false
     };
 
-    await self.registration.showNotification(notificationTitle, notificationOptions);
+    // Show notification
+    const notification = await self.registration.showNotification(notificationTitle, notificationOptions);
+
+    // Handle notification click
+    self.addEventListener('notificationclick', (event) => {
+      console.log('Notification clicked:', event);
+      
+      event.notification.close();
+      
+      // Get the action that was clicked
+      const action = event.action;
+      
+      // Handle the action
+      switch (action) {
+        case 'open':
+          // Open the game URL
+          event.waitUntil(
+            clients.matchAll({
+              type: 'window',
+              includeUncontrolled: true
+            }).then(windowClients => {
+              // Check if we already have a window open with the target URL
+              let matchingClient = null;
+              for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url === event.notification.data.url && 'focus' in client) {
+                  matchingClient = client;
+                  break;
+                }
+              }
+
+              if (matchingClient) {
+                return matchingClient.focus();
+              }
+
+              // If no existing window, open a new one
+              return clients.openWindow(event.notification.data.url);
+            })
+          );
+          break;
+        
+        default:
+          console.log('Unknown action:', action);
+          break;
+      }
+    });
+
+    // Handle notification close
+    self.addEventListener('notificationclose', (event) => {
+      console.log('Notification closed:', event);
+    });
+
   } catch (error) {
     console.error('❌ Error handling notification:', error);
   }

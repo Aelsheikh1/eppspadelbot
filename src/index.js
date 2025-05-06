@@ -30,15 +30,15 @@ const initializeNotifications = async () => {
     // Register service worker for notifications
     if ('serviceWorker' in navigator) {
       try {
-        // First, wait for service worker to be ready
-        const registration = await navigator.serviceWorker.ready;
-        console.log('✅ Service Worker ready:', registration);
-
-        // Send Firebase config to service worker
-        registration.active.postMessage({
-          type: 'FIREBASE_CONFIG',
-          config: firebaseConfig
+        // Register service worker
+        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+          scope: '/',
         });
+        console.log('✅ Service Worker registered:', registration);
+
+        // Wait for service worker to be ready
+        await navigator.serviceWorker.ready;
+        console.log('✅ Service Worker ready');
 
         // Initialize Firebase Messaging
         const messaging = getMessaging(app);

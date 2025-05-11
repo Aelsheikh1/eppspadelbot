@@ -307,8 +307,7 @@ function AppContent() {
               console.warn('[Notifications] Failed to register FCM token');
             }
           }
-        }
-      } catch (error) {
+        } catch (error) {
         console.error('[Notifications] Error initializing notifications:', error);
       }
     };

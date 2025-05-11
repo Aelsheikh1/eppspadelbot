@@ -277,26 +277,15 @@ const AppWithTheme = ({ children }) => {
   );
 };
 
-// Render the appropriate app based on device type
-if (isMobileDevice) {
-  console.log('📱 Rendering mobile-optimized app');
-  root.render(
-    <React.StrictMode>
-      <AppWithTheme>
-        <MobileApp />
-      </AppWithTheme>
-    </React.StrictMode>
-  );
-} else {
-  console.log('🖥️ Rendering desktop app');
-  root.render(
-    <React.StrictMode>
-      <AppWithTheme>
-        <App />
-      </AppWithTheme>
-    </React.StrictMode>
-  );
-}
+// Always render the main App component regardless of device type
+console.log(isMobileDevice ? '📱 Detected mobile device' : '🖥️ Detected desktop device');
+root.render(
+  <React.StrictMode>
+    <AppWithTheme>
+      <App />
+    </AppWithTheme>
+  </React.StrictMode>
+);
 
 // Report web vitals
 reportWebVitals();

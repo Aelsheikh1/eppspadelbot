@@ -1,13 +1,39 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const fs = require('fs');
 
-// Initialize Firebase Admin SDK with service account
-const serviceAccount = require('./service-account.json');
+// Load environment variables from .env file
+require('dotenv').config();
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
-});
+// Initialize Firebase Admin SDK with service account or environment variables
+let firebaseConfig;
+
+// Check if service account file exists
+if (fs.existsSync('./service-account.json')) {
+  // Use service account file in development
+  const serviceAccount = require('./service-account.json');
+  firebaseConfig = {
+    credential: admin.credential.cert(serviceAccount),
+    databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+  };
+} else {
+  // Use environment variables in production
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const databaseURL = process.env.FIREBASE_DATABASE_URL || `https://${projectId}.firebaseio.com`;
+  
+  firebaseConfig = {
+    credential: admin.credential.cert({
+      projectId,
+      clientEmail,
+      privateKey
+    }),
+    databaseURL
+  };
+}
+
+admin.initializeApp(firebaseConfig);
 
 // Import notification functions
 const notifications = require('./notifications');

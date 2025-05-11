@@ -18,11 +18,12 @@ import CustomNotificationSender from './components/CustomNotificationSender';
 import NotificationTestPage from './components/NotificationTestPage';
 import MobileNotificationTest from './components/MobileNotificationTest';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
-import { ToastContainer } from 'react-toastify';
+import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { registerFCMToken, showLocalNotification } from './services/notificationService';
 import { initNotificationListener } from './utils/notificationListener';
 import { requestPermission } from './utils/simpleNotifications';
+import { initializeAppNotifications, requestAppNotificationPermission, getNotificationSystemInfo } from './utils/pushNotificationManager';
 
 // Create Theme Context
 const ThemeContext = createContext();
@@ -295,44 +296,35 @@ function AppContent() {
           // Register FCM token using the robust implementation
           const token = await requestFcmToken();
           
-          if (token) {
-            console.log('[Notifications] Successfully registered FCM token');
+          if (result) {
+            console.log('[Notifications] App notifications initialized successfully');
             
-            // Show a welcome notification to confirm everything is working
-            // Only for first login, not on every reload
-            const lastNotificationShown = localStorage.getItem('lastNotificationShown');
-            const now = new Date().getTime();
-            
-            // Only show welcome notification if it hasn't been shown in the last 24 hours
-            if (!lastNotificationShown || (now - parseInt(lastNotificationShown)) > 24 * 60 * 60 * 1000) {
-              showLocalNotification(
-                'Notifications Enabled', 
-                'You will now receive notifications for game updates!',
-                { type: 'welcome' }
-              );
-              localStorage.setItem('lastNotificationShown', now.toString());
+            // Also register FCM token for web notifications (backward compatibility)
+            const token = await registerFCMToken(currentUser.uid);
+            if (token) {
+              console.log('[Notifications] FCM token registered successfully');
+            } else {
+              console.warn('[Notifications] Failed to register FCM token');
             }
-          } else {
-            console.warn('[Notifications] Failed to register FCM token');
           }
-        } catch (error) {
-          console.error('[Notifications] Error initializing notifications:', error);
         }
-      };
-      
-      // Run immediately
+      } catch (error) {
+        console.error('[Notifications] Error initializing notifications:', error);
+      }
+    };
+    
+    // Run immediately
+    initNotifications();
+    
+    // Also set up a periodic refresh of the token (every 24 hours)
+    const tokenRefreshInterval = setInterval(() => {
+      console.log('[Notifications] Refreshing FCM token...');
       initNotifications();
-      
-      // Also set up a periodic refresh of the token (every 24 hours)
-      const tokenRefreshInterval = setInterval(() => {
-        console.log('[Notifications] Refreshing FCM token...');
-        initNotifications();
-      }, 24 * 60 * 60 * 1000); // 24 hours
-      
-      return () => {
-        clearInterval(tokenRefreshInterval);
-      };
-    }
+    }, 24 * 60 * 60 * 1000); // 24 hours
+    
+    return () => {
+      clearInterval(tokenRefreshInterval);
+    };
   }, [currentUser]);
 
   const triggerTestNotification = () => {
@@ -386,10 +378,30 @@ function App() {
   
   // Initialize the custom notification listener when the app loads
   useEffect(() => {
-    // Request notification permission on app load
-    requestPermission();
-    initNotificationListener();
-  }, []); 
+    // Initialize both web and mobile notifications
+    const setupNotifications = async () => {
+      try {
+        // Request notification permission
+        await requestAppNotificationPermission();
+        
+        // Initialize notifications
+        const result = await initializeAppNotifications();
+        
+        if (result) {
+          console.log('Notifications initialized successfully');
+          const systemInfo = getNotificationSystemInfo();
+          console.log('Notification system info:', systemInfo);
+        }
+        
+        // Also initialize the web notification listener for backward compatibility
+        initNotificationListener();
+      } catch (error) {
+        console.error('Error setting up notifications:', error);
+      }
+    };
+    
+    setupNotifications();
+  }, []);
   
   // Toggle theme function
   const toggleTheme = () => {

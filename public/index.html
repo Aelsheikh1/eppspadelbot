@@ -60,26 +60,18 @@
     <link rel="icon" type="image/png" sizes="192x192" href="%PUBLIC_URL%/web-app-manifest-192x192.png" />
     <link rel="icon" type="image/png" sizes="512x512" href="%PUBLIC_URL%/web-app-manifest-512x512.png" />
     <script>
-      // Initialize Firebase
-      const firebaseConfig = {
-        apiKey: "${process.env.REACT_APP_FIREBASE_API_KEY}",
-        authDomain: "${process.env.REACT_APP_FIREBASE_AUTH_DOMAIN}",
-        projectId: "${process.env.REACT_APP_FIREBASE_PROJECT_ID}",
-        storageBucket: "${process.env.REACT_APP_FIREBASE_STORAGE_BUCKET}",
-        messagingSenderId: "${process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID}",
-        appId: "${process.env.REACT_APP_FIREBASE_APP_ID}",
-        measurementId: "${process.env.REACT_APP_FIREBASE_MEASUREMENT_ID}"
-      };
-
-      // Register service worker
+      // Register service worker - moved Firebase initialization to the React app
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('/firebase-messaging-sw.js')
-          .then(function(registration) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('/service-worker.js', {
+            scope: '/'
+          }).then(function(registration) {
             console.log('Service Worker registered successfully:', registration);
-          })
-          .catch(function(err) {
+            // Don't try to use Firebase here - it will be initialized in the React app
+          }).catch(function(err) {
             console.log('Service Worker registration failed:', err);
           });
+        });
       }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>

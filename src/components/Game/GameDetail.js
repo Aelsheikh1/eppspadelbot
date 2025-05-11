@@ -80,9 +80,12 @@ import {
   SportsScore as SportsScoreIcon,
   Share as ShareIcon
 } from '@mui/icons-material';
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
+import { safeFormatDate, safeFormatDistanceToNow, createDateFromStrings } from '../../utils/dateUtils';
+import { notifyGameJoined, notifyGameClosed } from '../../utils/browserNotifications';
 import { toast } from 'react-toastify';
 import ConvertGameToTournament from '../Tournament/ConvertGameToTournament';
+import { sendGameRegistrationConfirmation, sendGameNotification } from '../../utils/gameNotifications';
 
 // Component for game header information
 const GameHeader = ({ game, timeUntilGame }) => {
@@ -723,10 +726,20 @@ const GameDetail = () => {
     if (!game?.date || !game?.time) return;
 
     const updateTime = () => {
-      const gameDateTime = new Date(`${game.date}T${game.time}`);
+      // Create a date object using our utility function
+      const gameDateTime = createDateFromStrings(game.date, game.time);
+      
+      // If the date is invalid, show appropriate message
+      if (!gameDateTime) {
+        setTimeUntilGame('Date not set');
+        return;
+      }
+      
+      // Check if the game has started
       const now = new Date();
       if (gameDateTime > now) {
-        setTimeUntilGame(formatDistanceToNow(gameDateTime, { addSuffix: true }));
+        // Use our safe utility function to format the time until game
+        setTimeUntilGame(safeFormatDistanceToNow(gameDateTime, { addSuffix: true }));
       } else {
         setTimeUntilGame('Game has started');
       }
@@ -824,8 +837,60 @@ const GameDetail = () => {
       }
       if (isPlayerInGame) {
         await leaveGame(id, currentUser.uid);
+        
+        // Show toast notification for leaving game
+        toast.info('You have left the game.', {
+          style: {
+            background: '#2A2A2A', // Darker background as per user preference
+            color: '#FFFFFF',     // White text for better readability
+            borderRadius: '8px',
+            padding: '16px',
+          },
+          icon: '👋'
+        });
       } else {
         await joinGame(id, currentUser.uid);
+        
+        try {
+          // Prepare notification data
+          const notificationData = {
+            id: id,
+            location: game.location,
+            date: game.date,
+            time: game.time,
+            formattedDate: format(new Date(game.date), 'MMMM do, yyyy')
+          };
+          
+          // Send confirmation notification to the user who joined via Firestore
+          await sendGameNotification('gameConfirmation', notificationData, [currentUser.uid]);
+          
+          // Show a direct browser notification
+          notifyGameJoined(notificationData);
+          
+          // Show success toast with dark theme styling
+          toast.success('Game joined successfully!', {
+            style: {
+              background: '#2A2A2A', // Darker background as per user preference
+              color: '#FFFFFF',     // White text for better readability
+              borderRadius: '8px',
+              padding: '16px',
+            },
+            icon: '🎮'
+          });
+        } catch (notificationError) {
+          console.error('Error sending confirmation notification:', notificationError);
+          
+          // Still show a success message even if notification fails
+          toast.success('Game joined successfully!', {
+            style: {
+              background: '#2A2A2A', // Darker background as per user preference
+              color: '#FFFFFF',     // White text for better readability
+              borderRadius: '8px',
+              padding: '16px',
+            },
+            icon: '🎮'
+          });
+        }
       }
     } catch (error) {
       console.error('Error:', error);
@@ -877,7 +942,55 @@ const GameDetail = () => {
   const handleToggleStatus = async () => {
     setLoading(true);
     try {
+      // Get current game status before toggling
+      const gameRef = doc(db, 'games', id);
+      const gameDoc = await getDoc(gameRef);
+      const currentGame = gameDoc.data();
+      const wasOpen = currentGame.isOpen;
+      
+      // Toggle the game status
       await toggleGameStatus(id);
+      
+      // If the game was open and is now being closed, send notifications to all participants
+      if (wasOpen) {
+        // Prepare notification data
+        const notificationData = {
+          id,
+          location: currentGame.location,
+          date: format(new Date(currentGame.date), 'yyyy-MM-dd'),
+          time: currentGame.time,
+          // Add formatted date string for display
+          formattedDate: format(new Date(currentGame.date), 'MMMM do, yyyy')
+        };
+        
+        // Send gameClosed notifications to all players in the game via Firestore
+        await sendGameNotification('gameClosed', notificationData, currentGame.players);
+        
+        // Show a direct browser notification
+        notifyGameClosed(notificationData);
+        
+        // Show success toast with dark theme styling
+        toast.success('Game closed and notifications sent to all participants', {
+          style: {
+            background: '#2A2A2A', // Darker background as per user preference
+            color: '#FFFFFF',     // White text for better readability
+            borderRadius: '8px',
+            padding: '16px',
+          },
+          icon: '💪'
+        });
+      } else {
+        // Game was closed and is now open
+        toast.success('Game is now open for registration', {
+          style: {
+            background: '#2A2A2A', // Darker background as per user preference
+            color: '#FFFFFF',     // White text for better readability
+            borderRadius: '8px',
+            padding: '16px',
+          },
+          icon: '🔓'
+        });
+      }
     } catch (error) {
       console.error('Error:', error);
       console.log(error.message || 'Failed to toggle game status');

@@ -49,7 +49,9 @@ export const initializeNotifications = async () => {
 export const setupForegroundMessages = () => {
     try {
         onMessage(messaging, (payload) => {
-            console.log('Received foreground message:', payload);
+            if (payload.notification && payload.notification.title) {
+                alert(`${payload.notification.title}\n${payload.notification.body || ''}`);
+            }
             
             // Show notification in foreground
             const notificationTitle = payload.notification?.title || 'New Message';

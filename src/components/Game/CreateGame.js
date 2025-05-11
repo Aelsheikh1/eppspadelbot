@@ -12,11 +12,19 @@ import {
   MenuItem,
   Paper,
   Alert,
+  CircularProgress
 } from '@mui/material';
-import { addDoc, collection, getDocs, query, where } from 'firebase/firestore';
+import AddIcon from '@mui/icons-material/Add';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import {
+  addDoc, collection, getDocs, query, where
+} from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { format } from 'date-fns';
+import { notifyGameCreated } from '../../utils/browserNotifications';
 import { useAuth } from '../../contexts/AuthContext';
+import { sendGameNotification } from '../../utils/gameNotifications';
+import { toast } from 'react-toastify';
 
 /**
  * Send game created notifications to all users
@@ -55,14 +63,7 @@ const sendGameCreatedNotifications = async (gameId, gameData) => {
         createdAt: new Date()
       });
 
-      // Optional: Send web push notification if supported
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification('New Game Created', {
-          body: `A new game has been created at ${gameData.location} on ${gameData.date} at ${gameData.time}`,
-          icon: '/logo192.png',
-          data: { gameId }
-        });
-      }
+      // Browser notifications are now handled by notifyGameCreated
     });
 
     // Wait for all notifications to be created
@@ -127,9 +128,37 @@ export default function CreateGame() {
 
       // Add the game to Firestore
       const gameDocRef = await addDoc(collection(db, 'games'), gameData);
+      const gameId = gameDocRef.id;
       
-      // Send notifications to all users
-      await sendGameCreatedNotifications(gameDocRef.id, gameData);
+      // Create notification data
+      const notificationData = {
+        id: gameId,
+        location: gameData.location,
+        date: format(new Date(gameData.date), 'yyyy-MM-dd'),
+        time: gameData.time,
+        // Add formatted date string for display
+        formattedDate: format(new Date(gameData.date), 'MMMM do, yyyy')
+      };
+      
+      // Send notifications to all users via Firestore
+      await sendGameNotification('gameCreated', notificationData);
+      
+      // Show a direct browser notification
+      notifyGameCreated(notificationData);
+      
+      // Show success toast with dark theme styling
+      toast.success('Game created successfully!', {
+        style: {
+          background: '#2A2A2A', // Darker background as per user preference
+          color: '#FFFFFF',     // White text for better readability
+          borderRadius: '8px',
+          padding: '16px',
+        },
+        icon: '🎮'
+      });
+      
+      // Note: We're no longer calling the old sendGameCreatedNotifications function
+      // to avoid duplicate notifications
       
       navigate('/admin/games');
     } catch (err) {
@@ -264,15 +293,64 @@ export default function CreateGame() {
             sx={{ mb: 2 }}
           />
 
-          <Button
-            type="submit"
-            fullWidth
-            variant="contained"
-            disabled={loading}
-            sx={{ mt: 2 }}
-          >
-            Create Game
-          </Button>
+          <Box sx={{ mt: 3, display: 'flex', justifyContent: 'space-between' }}>
+            <Button
+              type="button"
+              variant="outlined"
+              color="secondary"
+              onClick={async () => {
+                // Create test notification data
+                const testGameData = {
+                  id: 'test-game-id',
+                  location: 'Test Location',
+                  date: format(new Date(), 'yyyy-MM-dd'),
+                  time: '18:00',
+                  formattedDate: format(new Date(), 'MMMM do, yyyy')
+                };
+                
+                // Show a direct browser notification
+                const notificationShown = await notifyGameCreated(testGameData);
+                
+                // Show toast with dark theme styling
+                toast.info(
+                  notificationShown ? 
+                    'Test notification sent successfully!' : 
+                    'Please enable notifications in your browser settings', 
+                  {
+                    style: {
+                      background: '#2A2A2A',
+                      color: '#FFFFFF',
+                      borderRadius: '8px',
+                      padding: '16px',
+                    },
+                    icon: notificationShown ? '✅' : '⚠️'
+                  }
+                );
+              }}
+              startIcon={<NotificationsIcon />}
+              sx={{ 
+                backgroundColor: theme => theme.palette.mode === 'dark' ? '#2A2A2A' : undefined,
+                color: theme => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                borderColor: theme => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                '&:hover': {
+                  backgroundColor: theme => theme.palette.mode === 'dark' ? '#3A3A3A' : undefined,
+                }
+              }}
+            >
+              Test Notification
+            </Button>
+            
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={loading}
+              startIcon={loading ? <CircularProgress size={24} /> : <AddIcon />}
+              sx={{ color: '#FFFFFF' }}
+            >
+              {loading ? 'Creating...' : 'Create Game'}
+            </Button>
+          </Box>
         </Box>
       </Paper>
     </Container>

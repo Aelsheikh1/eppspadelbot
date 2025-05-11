@@ -28,7 +28,7 @@ import {
   orderBy,
   addDoc
 } from 'firebase/firestore';
-import { getMessaging, getToken, onMessage } from 'firebase/messaging';
+import { getMessaging, getToken, onMessage, sendMulticast } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
@@ -43,6 +43,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const messaging = getMessaging(app);
 
 // Configure Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -692,102 +693,394 @@ export const getAllTournaments = async () => {
   }
 };
 
-// FCM: Request permission and get token
+// VAPID key for web push notifications
+const VAPID_KEY = 'BMzSIFpKw-T23cx8aoIfssl2Q8oYxKZVIXY5qYkrAVOzXXOzN3eIhhyQhsuA6_mnC4go0hk9IWQ06Dwqe-eHSfE';
+
+// Initialize service worker for push notifications
+export const initializeServiceWorker = async () => {
+  if ('serviceWorker' in navigator) {
+    try {
+      // First check if service worker is already registered
+      const existingRegistration = await navigator.serviceWorker.getRegistration('/firebase-messaging-sw.js');
+      
+      if (existingRegistration) {
+        console.log('[SW] Service Worker already registered with scope:', existingRegistration.scope);
+        
+        // Ensure it's active and controlling
+        if (existingRegistration.active) {
+          console.log('[SW] Service Worker is active');
+          
+          // Send Firebase config to the service worker
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'FIREBASE_CONFIG',
+              config: firebaseConfig
+            });
+            console.log('[SW] Firebase config sent to existing Service Worker');
+          }
+          
+          return existingRegistration;
+        }
+      }
+      
+      // Register the service worker if not already registered or not active
+      console.log('[SW] Registering new Service Worker...');
+      const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
+        scope: '/'
+      });
+      
+      console.log('[SW] Service Worker registered with scope:', registration.scope);
+      
+      // Wait for the service worker to be activated
+      if (registration.installing) {
+        console.log('[SW] Service Worker installing...');
+        
+        // Wait for installation to complete
+        await new Promise(resolve => {
+          registration.installing.addEventListener('statechange', (event) => {
+            if (event.target.state === 'activated') {
+              console.log('[SW] Service Worker activated');
+              resolve();
+            }
+          });
+        });
+      }
+      
+      // Send Firebase config to the service worker
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'FIREBASE_CONFIG',
+          config: firebaseConfig
+        });
+        console.log('[SW] Firebase config sent to Service Worker');
+      }
+      
+      return registration;
+    } catch (error) {
+      console.error('[SW] Service Worker registration failed:', error);
+      return null;
+    }
+  } else {
+    console.warn('[SW] Service workers are not supported in this browser');
+    return null;
+  }
+};
+
+// Function to unregister service worker if needed
+export const unregisterServiceWorker = async () => {
+  if ('serviceWorker' in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        const unregistered = await registration.unregister();
+        if (unregistered) {
+          console.log('Service Worker successfully unregistered');
+          return true;
+        } else {
+          console.warn('Service Worker unregistration failed');
+          return false;
+        }
+      }
+      return false;
+    } catch (error) {
+      console.error('Error unregistering Service Worker:', error);
+      return false;
+    }
+  }
+  return false;
+};
+
+// Foreground FCM message handler: show notification using Notification API
+onMessage(messaging, (payload) => {
+  console.log('[FCM] Foreground message received:', payload);
+  if (payload.notification && payload.notification.title) {
+    // Use a simpler notification approach with dark mode styling
+    const notification = new Notification(payload.notification.title, {
+      body: payload.notification.body || '',
+      icon: '/logo192.png',
+      tag: payload.data?.gameId || 'default',
+      renotify: true,
+      silent: false,
+      // Dark mode styling for notification
+      badge: '/logo192.png'
+    });
+
+    // Handle click to navigate to game
+    notification.onclick = () => {
+      window.focus();
+      if (payload.data?.gameId) {
+        window.location.href = `/games/${payload.data.gameId}`;
+      }
+      notification.close();
+    };
+  }
+});
+
+// Handle token refresh
+export const setupTokenRefresh = () => {
+  try {
+    // Check if messaging is supported
+    if (!messaging) {
+      console.warn('[FCM] Messaging not initialized');
+      return;
+    }
+    
+    // Set up a timer to periodically check and refresh the token
+    // This is a workaround since onTokenRefresh is deprecated in newer Firebase versions
+    const refreshInterval = setInterval(async () => {
+      console.log('[FCM] Checking if token needs refresh...');
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        console.log('[FCM] No user logged in, skipping token refresh');
+        return;
+      }
+      
+      try {
+        // Ensure service worker is ready
+        const swRegistration = await navigator.serviceWorker.ready;
+        console.log('[FCM] Service worker ready for token refresh');
+        
+        // Get a fresh token
+        const freshToken = await getToken(messaging, { 
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: swRegistration
+        });
+        
+        if (freshToken) {
+          console.log('[FCM] Token refreshed:', freshToken.substring(0, 10) + '...');
+          
+          // Send to service worker
+          if (navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              type: 'UPDATE_FCM_TOKEN',
+              token: freshToken
+            });
+            console.log('[FCM] Refreshed token sent to service worker');
+          } else {
+            console.warn('[FCM] No service worker controller available for token update');
+          }
+          
+          // Update in Firestore
+          const userRef = doc(db, 'users', currentUser.uid);
+          const userDoc = await getDoc(userRef);
+          
+          // Check if this is actually a new token
+          const existingTokens = userDoc.exists() && userDoc.data().fcmTokens ? userDoc.data().fcmTokens : [];
+          if (!existingTokens.includes(freshToken)) {
+            await updateDoc(userRef, {
+              fcmTokens: arrayUnion(freshToken),
+              lastTokenUpdate: new Date().toISOString()
+            });
+            console.log('[FCM] New refreshed token saved to Firestore');
+          } else {
+            console.log('[FCM] Token already exists in Firestore, updating timestamp');
+            await updateDoc(userRef, {
+              lastTokenUpdate: new Date().toISOString()
+            });
+          }
+        } else {
+          console.warn('[FCM] Failed to get fresh token during refresh check');
+        }
+      } catch (error) {
+        console.error('[FCM] Error during token refresh check:', error);
+      }
+    }, 12 * 60 * 60 * 1000); // Check twice per day for more reliability
+    
+    // Clean up interval on page unload
+    window.addEventListener('beforeunload', () => {
+      clearInterval(refreshInterval);
+    });
+    
+    console.log('[FCM] Token refresh monitoring set up');
+  } catch (error) {
+    console.error('[FCM] Error setting up token refresh:', error);
+  }
+};
+
+// Robust FCM token registration that ensures tokens are properly stored in both user document and tokens collection
 export const requestFcmToken = async () => {
   try {
     // Check if notifications are supported
     if (!('Notification' in window)) {
-      console.error('Notifications are not supported in this browser');
+      console.warn('[FCM] Notifications not supported in this browser');
       return null;
     }
 
-    // Request permission
-    const permission = await Notification.requestPermission();
-    if (permission !== 'granted') {
-      console.warn('Notification permission not granted');
+    // Request permission if not already granted
+    if (Notification.permission !== 'granted') {
+      console.log('[FCM] Requesting notification permission...');
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.warn('[FCM] Notification permission denied by user');
+        return null;
+      }
+    }
+
+    // Get current user
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn('[FCM] No authenticated user for token registration');
       return null;
     }
 
-    // Get service worker registration
-    const registration = await navigator.serviceWorker.ready;
-    if (!registration) {
-      console.error('Service Worker not registered');
-      return null;
+    // Wait for service worker to be ready
+    if ('serviceWorker' in navigator) {
+      await navigator.serviceWorker.ready;
+      console.log('[FCM] Service worker is ready for messaging');
     }
 
-    // Initialize Firebase Messaging
+    // Get FCM token
+    console.log('[FCM] Getting token for user:', currentUser.uid);
     const messaging = getMessaging(app);
-
-    // Subscribe to messages
-    await messaging.getToken({
-      vapidKey: 'BLF0nO_s9jj43GrZg9SgOnCtDYodczIJ8sL5Mx1vNl05RlToKnjrcQSVPip_lFc3CYipnzIjx0Q0r3FRw6vCa_s'
+    
+    // Ensure service worker is ready before getting token
+    const swRegistration = await navigator.serviceWorker.ready;
+    console.log('[FCM] Service worker ready for token request');
+    
+    const token = await getToken(messaging, { 
+      vapidKey: VAPID_KEY,
+      serviceWorkerRegistration: swRegistration
     });
-
-    // Get the token
-    const token = await getToken(messaging, {
-      vapidKey: 'BLF0nO_s9jj43GrZg9SgOnCtDYodczIJ8sL5Mx1vNl05RlToKnjrcQSVPip_lFc3CYipnzIjx0Q0r3FRw6vCa_s'
-    });
-
+    
     if (!token) {
-      console.error('Failed to get FCM token');
+      console.error('[FCM] Failed to get FCM token');
       return null;
     }
 
-    console.log('FCM Token:', token);
-
-    // Send token to service worker
-    registration.active.postMessage({
-      type: 'UPDATE_FCM_TOKEN',
-      token: token
-    });
-
-    // Setup foreground message handler
-    onMessage(messaging, (payload) => {
-      console.log('Received foreground message:', payload);
+    console.log('[FCM] Token obtained:', token.substring(0, 10) + '...');
+    
+    // Send token to service worker if available with user information
+    if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      // Create a unique device identifier
+      const deviceId = `${currentUser.uid}_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
       
-      // Get unique notification ID
-      const notificationId = `notification-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+      // Get user role information
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userRef);
+      const isAdmin = userDoc.exists() ? userDoc.data().isAdmin === true : false;
+      const userRole = isAdmin ? 'admin' : 'user';
       
-      // Close any existing notifications
-      const existingNotifications = Array.from(document.getElementsByTagName('notification'));
-      existingNotifications.forEach(n => n.close());
-
-      // Show new notification
-      const notification = new Notification(payload.notification.title, {
-        body: payload.notification.body,
-        icon: '/favicon-96x96.png',
-        badge: '/favicon-96x96.png',
-        data: {
-          ...payload.data,
-          notificationId
-        },
-        tag: notificationId,
-        requireInteraction: true
+      // Send complete user information to service worker
+      navigator.serviceWorker.controller.postMessage({
+        type: 'UPDATE_FCM_TOKEN',
+        token: token,
+        userId: currentUser.uid,
+        userRole: userRole,
+        deviceId: deviceId
       });
-
-      // Close notification after 5 seconds if not interacted with
-      setTimeout(() => {
-        if (!notification.closed) {
-          notification.close();
+      
+      console.log(`[FCM] Token sent to service worker for user ${currentUser.uid} with role ${userRole}`);
+      
+      // Also store device ID in user document
+      try {
+        await updateDoc(userRef, {
+          devices: arrayUnion(deviceId)
+        });
+      } catch (deviceError) {
+        console.warn('[FCM] Error storing device ID:', deviceError);
+      }
+    }
+    
+    // Store token in user document and dedicated tokens collection for better querying
+    try {
+      // 1. Store in user document
+      const userRef = doc(db, 'users', currentUser.uid);
+      const userDoc = await getDoc(userRef);
+      
+      // Check if token already exists to avoid duplicates
+      const existingTokens = userDoc.exists() && userDoc.data().fcmTokens ? userDoc.data().fcmTokens : [];
+      if (existingTokens.includes(token)) {
+        console.log('[FCM] Token already exists for user:', currentUser.uid);
+        // Just update the timestamp
+        await updateDoc(userRef, {
+          lastTokenUpdate: new Date().toISOString()
+        });
+      } else {
+        // Add the new token
+        console.log('[FCM] Adding new token to user document');
+        // Prepare user data with token and notification preferences
+        const userData = {
+          fcmTokens: arrayUnion(token),
+          lastTokenUpdate: new Date().toISOString()
+        };
+        
+        // If user doc doesn't exist or doesn't have notification settings, add default settings
+        if (!userDoc.exists() || !userDoc.data().notificationSettings) {
+          userData.notificationSettings = {
+            gameCreated: true,
+            gameClosingSoon: true,
+            gameClosed: true,
+            tournamentUpdates: true
+          };
         }
-      }, 5000);
 
-      // Handle notification click
-      notification.onclick = () => {
-        console.log('Notification clicked');
-        notification.close();
-        window.focus();
-      };
+        // Update the user document
+        await updateDoc(userRef, userData);
+        console.log('[FCM] Token added to user document for:', currentUser.uid);
+      }
+      
+      // 2. Also store in fcmTokens collection for easier querying
+      try {
+        const tokenRef = doc(db, 'fcmTokens', token.substring(0, 40));
+        const userRole = userDoc.exists() ? userDoc.data().isAdmin === true ? 'admin' : 'user' : 'user';
+        await setDoc(tokenRef, {
+          userId: currentUser.uid,
+          email: currentUser.email,
+          isAdmin: userDoc.exists() ? userDoc.data().isAdmin === true : false,
+          userRole,
+          token: token,
+          createdAt: new Date().toISOString(),
+          lastActive: new Date().toISOString(),
+          device: navigator.userAgent
+        });
+        console.log('[FCM] Token also stored in fcmTokens collection');
+      } catch (tokenError) {
+        // Non-critical error, just log it
+        console.warn('[FCM] Error storing token in fcmTokens collection:', tokenError);
+      }
 
-      // Handle notification close
-      notification.onclose = () => {
-        console.log('Notification closed');
-      };
-    });
-
-    return token;
+      console.log('[FCM] Token successfully registered for:', currentUser.uid);
+      return token;
+    } catch (error) {
+      console.error('[FCM] Error updating user document with token:', error);
+      return null;
+    }
   } catch (err) {
-    console.error('Error getting FCM token:', err);
+    console.error('[FCM] Error in requestFcmToken:', err);
+    return null;
+  }
+};
+
+// Utility to force FCM token registration for the current user
+export const forceRegisterFcmToken = async () => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn('[FCM] No authenticated user for token registration');
+      return null;
+    }
+    if (window.Notification && Notification.permission === 'granted') {
+      const messaging = getMessaging(app);
+      // Ensure service worker is ready
+      const swRegistration = await navigator.serviceWorker.ready;
+      const token = await getToken(messaging, { 
+        vapidKey: VAPID_KEY,
+        serviceWorkerRegistration: swRegistration 
+      });
+      if (token) {
+        const userRef = doc(db, 'users', currentUser.uid);
+        await updateDoc(userRef, { fcmTokens: arrayUnion(token) });
+        console.log('[FCM] Forced token added to Firestore for user:', currentUser.uid, token);
+        return token;
+      } else {
+        console.warn('[FCM] No token returned from getToken');
+      }
+    } else {
+      console.warn('[FCM] Notification permission not granted or Notification API not available');
+    }
+    return null;
+  } catch (err) {
+    console.error('[FCM] Error forcing FCM token registration:', err);
     return null;
   }
 };

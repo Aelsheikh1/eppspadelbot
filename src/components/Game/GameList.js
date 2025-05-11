@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { parseISO, isAfter, differenceInDays, differenceInHours, differenceInMinutes, differenceInMilliseconds, format, formatDistanceToNow } from 'date-fns';
+import { parseISO, isAfter, differenceInDays, differenceInHours, differenceInMinutes, differenceInMilliseconds, format } from 'date-fns';
+import { safeFormatDate, safeFormatDistanceToNow, createDateFromStrings } from '../../utils/dateUtils';
 import PlayerAvatar from '../common/PlayerAvatar';
 import {
   Box,
@@ -85,12 +86,17 @@ const TimeUnit = ({ value, unit }) => (
       alignItems: 'center',
       mx: 0.3,
       minWidth: 28,
-      bgcolor: 'primary.light',
+      background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.dark} 0%, ${theme.palette.primary.main} 100%)`,
       borderRadius: 10,
       px: 1,
       py: 0.3,
-      boxShadow: 1,
+      boxShadow: '0 2px 8px 0 rgba(92, 107, 192, 0.4)',
       transition: 'all 0.2s',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      '&:hover': {
+        transform: 'translateY(-2px)',
+        boxShadow: '0 4px 12px 0 rgba(92, 107, 192, 0.5)'
+      }
     }}
   >
     <Typography
@@ -99,21 +105,23 @@ const TimeUnit = ({ value, unit }) => (
       sx={{
         fontFamily: 'monospace',
         fontWeight: 700,
-        fontSize: '1.05rem',
-        lineHeight: 1.1,
+        fontSize: '0.85rem',
+        lineHeight: 1.2,
+        textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
       }}
     >
-      {value.toString().padStart(2, '0')}
+      {value < 10 ? `0${value}` : value}
     </Typography>
     <Typography
       variant="caption"
       color="#fff"
       sx={{
-        textTransform: 'uppercase',
-        fontSize: '0.65rem',
-        opacity: 0.85,
+        fontSize: '0.6rem',
         lineHeight: 1,
-        letterSpacing: 0.5,
+        opacity: 0.8,
+        fontWeight: 500,
+        textTransform: 'uppercase',
+        textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
       }}
     >
       {unit}
@@ -617,36 +625,100 @@ export default function GameList() {
           Games
         </Typography>
         <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'stretch', sm: 'center' }, gap: { xs: 1.5, sm: 2 }, width: { xs: '100%', sm: 'auto' } }}>
-          <ToggleButtonGroup
-            value={showOpenOnly ? 'open' : 'all'}
-            exclusive
-            onChange={(e, val) => setShowOpenOnly(val === 'open')}
-            sx={{
-              display: 'flex',
-              gap: 1,
-              '.MuiToggleButton-root': {
-                textTransform: 'none',
-                fontWeight: 600,
-                fontSize: '0.95rem',
-                px: 2,
-                py: 1,
-                border: '1px solid #1976d2',
-                borderRadius: '50px',
-                color: '#1976d2',
-                '&.Mui-selected': {
-                  backgroundColor: '#1976d2',
-                  color: '#fff'
-                }
-              }
+          <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              bgcolor: (theme) => alpha(theme.palette.primary.main, 0.08),
+              borderRadius: '50px',
+              px: 2,
+              py: 0.5,
+              border: (theme) => `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
+              boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 2px 8px rgba(0, 0, 0, 0.2)' : '0 2px 8px rgba(0, 0, 0, 0.05)',
+              transition: 'all 0.3s ease'
             }}
           >
-            <ToggleButton value="all" aria-label="Show all games">
-              <GroupIcon sx={{ mr: 1 }} /> All Games
-            </ToggleButton>
-            <ToggleButton value="open" aria-label="Show open games only">
-              <LockOpenIcon sx={{ mr: 1 }} /> Open Only
-            </ToggleButton>
-          </ToggleButtonGroup>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                fontWeight: 600,
+                color: (theme) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main,
+                mr: 1.5
+              }}
+            >
+              {showOpenOnly ? "Open Games Only" : "All Games"}
+            </Typography>
+            
+            <Box sx={{
+              position: 'relative',
+              display: 'inline-flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+            }}>
+              <Box
+                onClick={() => setShowOpenOnly(!showOpenOnly)}
+                sx={{
+                  width: 42,
+                  height: 22,
+                  borderRadius: 11,
+                  position: 'relative',
+                  transition: 'background-color 0.3s',
+                  bgcolor: (theme) => showOpenOnly 
+                    ? theme.palette.mode === 'dark' 
+                      ? alpha(theme.palette.primary.main, 0.9)
+                      : theme.palette.primary.main 
+                    : theme.palette.mode === 'dark' 
+                      ? alpha(theme.palette.grey[600], 0.5) 
+                      : alpha(theme.palette.grey[400], 0.5),
+                  '&:hover': {
+                    bgcolor: (theme) => showOpenOnly 
+                      ? theme.palette.mode === 'dark' 
+                        ? alpha(theme.palette.primary.main, 1)
+                        : theme.palette.primary.dark 
+                      : theme.palette.mode === 'dark' 
+                        ? alpha(theme.palette.grey[600], 0.7) 
+                        : alpha(theme.palette.grey[500], 0.7),
+                  },
+                  boxShadow: (theme) => theme.palette.mode === 'dark' 
+                    ? '0 2px 4px rgba(0, 0, 0, 0.3) inset' 
+                    : '0 1px 3px rgba(0, 0, 0, 0.1) inset',
+                }}
+              >
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    top: 2,
+                    left: showOpenOnly ? 'calc(100% - 20px)' : '2px',
+                    width: 18,
+                    height: 18,
+                    borderRadius: '50%',
+                    transition: 'left 0.3s, box-shadow 0.3s',
+                    bgcolor: '#fff',
+                    boxShadow: showOpenOnly
+                      ? '0 1px 5px rgba(0, 0, 0, 0.3)'
+                      : '0 1px 3px rgba(0, 0, 0, 0.2)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      width: 14,
+                      height: 14,
+                      borderRadius: '50%',
+                      transition: 'opacity 0.3s',
+                      opacity: 0.1,
+                      bgcolor: (theme) => showOpenOnly ? theme.palette.primary.main : 'transparent',
+                    }
+                  }}
+                />
+              </Box>
+              <Tooltip title={showOpenOnly ? "Show all games" : "Show open games only"}>
+                <Box sx={{ ml: 1, display: 'flex', color: (theme) => theme.palette.text.secondary }}>
+                  {showOpenOnly ? <LockOpenIcon fontSize="small" /> : <GroupIcon fontSize="small" />}
+                </Box>
+              </Tooltip>
+            </Box>
+          </Box>
           <Button
             variant="outlined"
             color="secondary"
@@ -684,24 +756,40 @@ export default function GameList() {
           .filter(game => !showOpenOnly || (game.status !== 'closed' && game.isOpen !== false))
           .map(game => {
           const status = getGameStatus(game);
-          const gameDateTime = parseISO(`${game.date}T${game.time}`);
-          const timeToGame = formatDistanceToNow(gameDateTime, { addSuffix: true });
+          // Use our safe utility function to get the time until game
+          const timeToGame = safeFormatDistanceToNow(
+            createDateFromStrings(game.date, game.time),
+            { addSuffix: true },
+            'Date not set'
+          );
           const userInGame = isUserInGame(game);
           const isExpanded = expandedGame === game.id;
 
           return (
             <Grid item xs={12} sm={12} md={6} lg={4} key={game.id}>
-              <Card 
-                sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
+              <Card
+                sx={{
+                  height: '100%',
+                  display: 'flex',
                   flexDirection: 'column',
+                  position: 'relative',
+                  overflow: 'visible',
+                  boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.5)',
+                  background: (theme) => `linear-gradient(135deg, 
+                    ${theme.palette.background.card} 0%, 
+                    ${alpha(theme.palette.primary.dark, 0.15)} 100%)`,
                   '&:hover': {
-                    boxShadow: 6,
+                    boxShadow: '0 8px 25px 0 rgba(0, 0, 0, 0.6)',
+                    transform: 'translateY(-4px)',
+                    transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+                    background: (theme) => `linear-gradient(135deg, 
+                      ${theme.palette.background.card} 0%, 
+                      ${alpha(theme.palette.primary.dark, 0.25)} 100%)`,
                   },
                   mb: { xs: 2, sm: 0 },
                   borderRadius: { xs: 2, sm: 3 },
-                  minWidth: 0
+                  minWidth: 0,
+                  border: '1px solid rgba(255, 255, 255, 0.08)'
                 }}
               >
                 <CardContent sx={{ flexGrow: 1, p: { xs: 2, sm: 3 } }}>
@@ -712,16 +800,18 @@ export default function GameList() {
   <Typography variant="h6" component="div" sx={{ fontWeight: 700, letterSpacing: 1 }}>
     Padel Game
   </Typography>
-  <Tooltip title="Game Actions" arrow>
-    <IconButton
-      size="small"
-      onClick={(e) => handleMenuOpen(e, game)}
-      sx={{ ml: 1, flexShrink: 0 }}
-      aria-label="Game actions menu"
-    >
-      <MoreVertIcon />
-    </IconButton>
-  </Tooltip>
+  {isAdmin && (
+    <Tooltip title="Game Actions" arrow>
+      <IconButton
+        size="small"
+        onClick={(e) => handleMenuOpen(e, game)}
+        sx={{ ml: 1, flexShrink: 0 }}
+        aria-label="Game actions menu"
+      >
+        <MoreVertIcon />
+      </IconButton>
+    </Tooltip>
+  )}
 </Box>
 <Box
   sx={{
@@ -741,7 +831,13 @@ export default function GameList() {
                           color="error"
                           size="small"
                           icon={<LockIcon />}
-                          sx={{ fontWeight: 'medium', '& .MuiChip-icon': { fontSize: 16 } }}
+                          sx={{ 
+                            fontWeight: 'medium', 
+                            '& .MuiChip-icon': { fontSize: 16 },
+                            background: (theme) => `linear-gradient(135deg, ${theme.palette.error.dark} 30%, ${theme.palette.error.main} 90%)`,
+                            boxShadow: '0 2px 6px 0 rgba(244, 67, 54, 0.4)',
+                            border: '1px solid rgba(244, 67, 54, 0.5)'
+                          }}
                         />
                       ) : (game.isOpen && game.players?.length >= game.maxPlayers) ? (
                         <>
@@ -751,7 +847,14 @@ export default function GameList() {
                             color="warning"
                             size="small"
                             icon={<GroupIcon />}
-                            sx={{ fontWeight: 'medium', ml: 1, '& .MuiChip-icon': { fontSize: 16 } }}
+                            sx={{ 
+                              fontWeight: 'medium', 
+                              ml: 1, 
+                              '& .MuiChip-icon': { fontSize: 16 },
+                              background: (theme) => `linear-gradient(135deg, ${theme.palette.warning.dark} 30%, ${theme.palette.warning.main} 90%)`,
+                              boxShadow: '0 2px 6px 0 rgba(255, 167, 38, 0.4)',
+                              border: '1px solid rgba(255, 167, 38, 0.5)'
+                            }}
                           />
                         </>
                       ) : (game.isOpen) ? (
@@ -762,7 +865,14 @@ export default function GameList() {
                             color="success"
                             size="small"
                             icon={<LockOpenIcon />}
-                            sx={{ fontWeight: 'medium', ml: 1, '& .MuiChip-icon': { fontSize: 16 } }}
+                            sx={{ 
+                              fontWeight: 'medium', 
+                              ml: 1, 
+                              '& .MuiChip-icon': { fontSize: 16 },
+                              background: (theme) => `linear-gradient(135deg, ${theme.palette.success.dark} 30%, ${theme.palette.success.main} 90%)`,
+                              boxShadow: '0 2px 6px 0 rgba(102, 187, 106, 0.4)',
+                              border: '1px solid rgba(102, 187, 106, 0.5)'
+                            }}
                           />
                         </>
                       ) : (
@@ -785,7 +895,11 @@ export default function GameList() {
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <CalendarIcon sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} />
                         <Typography variant="body2">
-                          {format(gameDateTime, 'EEEE, MMMM d, yyyy')}
+                          {safeFormatDate(
+                            createDateFromStrings(game.date, game.time),
+                            'EEEE, MMMM d, yyyy',
+                            'Date not set'
+                          )}
                         </Typography>
                       </Box>
                     </Grid>
@@ -882,19 +996,57 @@ export default function GameList() {
                       color="primary"
                       onClick={() => isUserInGame(game) ? handleLeaveGame(game.id) : handleJoinGame(game.id)}
                       disabled={isRegistrationClosed(game) || (!isUserInGame(game) && game.players?.length >= game.maxPlayers) || game.status === 'closed'}
-                      sx={{ flexGrow: 1, mb: { xs: 1, sm: 0 }, width: { xs: '100%', sm: 'auto' } }}
+                      sx={{ 
+                        flexGrow: 1, 
+                        mb: { xs: 1, sm: 0 }, 
+                        width: { xs: '100%', sm: 'auto' },
+                        background: (theme) => isUserInGame(game) 
+                          ? 'transparent' 
+                          : `linear-gradient(135deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
+                        color: (theme) => isUserInGame(game) 
+                          ? (theme.palette.mode === 'dark' ? '#7986cb' : theme.palette.primary.main)
+                          : '#ffffff',
+                        borderWidth: (theme) => theme.palette.mode === 'dark' && isUserInGame(game) ? '2px' : '1px',
+                        fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
+                        letterSpacing: (theme) => theme.palette.mode === 'dark' ? '0.5px' : 'inherit',
+                        '&:hover': {
+                          background: (theme) => isUserInGame(game) 
+                            ? (theme.palette.mode === 'dark' ? 'rgba(121, 134, 203, 0.15)' : 'rgba(92, 107, 192, 0.12)') 
+                            : `linear-gradient(135deg, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 90%)`,
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px 0 rgba(121, 134, 203, 0.5)'
+                        },
+                        boxShadow: '0 2px 8px 0 rgba(121, 134, 203, 0.4)'
+                      }}
                     >
                       {isUserInGame(game) ? 'Leave Game' : (game.players?.length >= game.maxPlayers ? 'Full (Join Disabled)' : 'Join Game')}
                     </Button>
+                    
                     <Button
                       variant="outlined"
                       color="secondary"
                       onClick={() => handleShareGame(game.id)}
-                      sx={{ ml: { xs: 0, sm: 1 }, mb: { xs: 1, sm: 0 }, width: { xs: '100%', sm: 'auto' } }}
+                      sx={{ 
+                        ml: { xs: 0, sm: 1 }, 
+                        mb: { xs: 1, sm: 0 }, 
+                        width: { xs: '100%', sm: 'auto' },
+                        borderColor: (theme) => theme.palette.mode === 'dark' ? '#64b5f6' : theme.palette.secondary.main,
+                        color: (theme) => theme.palette.mode === 'dark' ? '#64b5f6' : theme.palette.secondary.main,
+                        borderWidth: (theme) => theme.palette.mode === 'dark' ? '2px' : '1px',
+                        fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
+                        '&:hover': {
+                          borderColor: (theme) => theme.palette.mode === 'dark' ? '#9be7ff' : theme.palette.secondary.dark,
+                          color: (theme) => theme.palette.mode === 'dark' ? '#9be7ff' : theme.palette.secondary.dark,
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px 0 rgba(100, 181, 246, 0.4)',
+                          backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(100, 181, 246, 0.1)' : 'rgba(33, 150, 243, 0.08)'
+                        }
+                      }}
                       startIcon={<ShareIcon />}
                     >
                       Share
                     </Button>
+                    
                     <Button
                       variant="outlined"
                       color="info"
@@ -905,10 +1057,25 @@ export default function GameList() {
                         </span>
                       }
                       onClick={() => navigate(`/games/${game.id}`)}
-                      sx={{ ml: { xs: 0, sm: 1 }, width: { xs: '100%', sm: 'auto' } }}
+                      sx={{ 
+                        ml: { xs: 0, sm: 1 }, 
+                        width: { xs: '100%', sm: 'auto' },
+                        borderColor: (theme) => theme.palette.mode === 'dark' ? '#29b6f6' : theme.palette.info.main,
+                        color: (theme) => theme.palette.mode === 'dark' ? '#29b6f6' : theme.palette.info.main,
+                        borderWidth: (theme) => theme.palette.mode === 'dark' ? '2px' : '1px',
+                        fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
+                        '&:hover': {
+                          borderColor: (theme) => theme.palette.mode === 'dark' ? '#73e8ff' : theme.palette.info.dark,
+                          color: (theme) => theme.palette.mode === 'dark' ? '#73e8ff' : theme.palette.info.dark,
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px 0 rgba(41, 182, 246, 0.4)',
+                          backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(41, 182, 246, 0.1)' : 'rgba(3, 169, 244, 0.08)'
+                        }
+                      }}
                     >
                       View Details
                     </Button>
+                    
                     {game.tournamentData && (
                       <Button
                         variant="outlined"
@@ -916,7 +1083,22 @@ export default function GameList() {
                         size="small"
                         startIcon={<TrophyIcon />}
                         onClick={() => handleShowHighlights(game)}
-                        sx={{ ml: { xs: 0, sm: 1 }, width: { xs: '100%', sm: 'auto' } }}
+                        sx={{
+                          color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.secondary.main,
+                          borderColor: (theme) => theme.palette.mode === 'dark' ? '#90CAF9' : theme.palette.secondary.main,
+                          borderWidth: (theme) => theme.palette.mode === 'dark' ? '2px' : '1px',
+                          fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
+                          backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.15)' : undefined,
+                          '&:hover': {
+                            borderColor: (theme) => theme.palette.mode === 'dark' ? '#BBDEFB' : theme.palette.secondary.dark,
+                            color: (theme) => theme.palette.mode === 'dark' ? '#BBDEFB' : theme.palette.secondary.dark,
+                            transform: 'translateY(-2px)',
+                            boxShadow: (theme) => theme.palette.mode === 'dark' 
+                              ? '0 4px 12px 0 rgba(144, 202, 249, 0.5)' 
+                              : '0 4px 12px 0 rgba(100, 181, 246, 0.4)',
+                            backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.25)' : 'rgba(33, 150, 243, 0.08)'
+                          }
+                        }}
                       >
                         View Tournament
                       </Button>
@@ -931,18 +1113,27 @@ export default function GameList() {
                       startIcon={<TrophyIcon />}
                       fullWidth
                       sx={{ 
+                        mt: 2,
                         borderStyle: 'dashed', 
+                        borderColor: (theme) => theme.palette.mode === 'dark' ? '#64b5f6' : theme.palette.secondary.main,
+                        color: (theme) => theme.palette.mode === 'dark' ? '#64b5f6' : theme.palette.secondary.main,
+                        borderWidth: (theme) => theme.palette.mode === 'dark' ? '2px' : '1px',
+                        fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
                         '&:hover': { 
-                          backgroundColor: alpha('#9c27b0', 0.04),
-                          borderStyle: 'solid'
+                          backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                            ? alpha(theme.palette.secondary.main, 0.15)
+                            : alpha(theme.palette.secondary.main, 0.08),
+                          borderStyle: 'solid',
+                          borderColor: (theme) => theme.palette.mode === 'dark' ? '#9be7ff' : theme.palette.secondary.dark,
+                          color: (theme) => theme.palette.mode === 'dark' ? '#9be7ff' : theme.palette.secondary.dark,
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 4px 12px 0 rgba(100, 181, 246, 0.4)'
                         } 
                       }}
                     >
                       Convert to Tournament
                     </Button>
                   )}
-                  
-
                 </CardActions>
               </Card>
             </Grid>
@@ -970,35 +1161,39 @@ export default function GameList() {
           horizontal: 'right',
         }}
       >
-        <MenuItem onClick={handleEditGame}>
-          <ListItemIcon>
-            <EditIcon fontSize="small" color="primary" />
-          </ListItemIcon>
-          <ListItemText primary="Edit Game" secondary="Modify game details" />
-        </MenuItem>
-        <MenuItem onClick={handleToggleGameStatus}>
-          <ListItemIcon>
-            {selectedGame?.status === 'closed' ? (
-              <LockOpenIcon fontSize="small" color="success" />
-            ) : (
-              <LockIcon fontSize="small" color="warning" />
-            )}
-          </ListItemIcon>
-          <ListItemText 
-            primary={selectedGame?.status === 'closed' ? 'Reopen Game' : 'Close Game'}
-            secondary={selectedGame?.status === 'closed' ? 'Allow players to join' : 'Prevent new joins'}
-          />
-        </MenuItem>
-        <MenuItem onClick={handleDeleteGame}>
-          <ListItemIcon>
-            <DeleteIcon fontSize="small" color="error" />
-          </ListItemIcon>
-          <ListItemText 
-            primary="Delete Game" 
-            secondary="Permanently remove game"
-            sx={{ color: 'error.main' }}
-          />
-        </MenuItem>
+        {isAdmin && (
+          <>
+            <MenuItem onClick={handleEditGame}>
+              <ListItemIcon>
+                <EditIcon fontSize="small" color="primary" />
+              </ListItemIcon>
+              <ListItemText primary="Edit Game" secondary="Modify game details" />
+            </MenuItem>
+            <MenuItem onClick={handleToggleGameStatus}>
+              <ListItemIcon>
+                {selectedGame?.status === 'closed' ? (
+                  <LockOpenIcon fontSize="small" color="success" />
+                ) : (
+                  <LockIcon fontSize="small" color="warning" />
+                )}
+              </ListItemIcon>
+              <ListItemText 
+                primary={selectedGame?.status === 'closed' ? 'Reopen Game' : 'Close Game'}
+                secondary={selectedGame?.status === 'closed' ? 'Allow players to join' : 'Prevent new joins'}
+              />
+            </MenuItem>
+            <MenuItem onClick={handleDeleteGame}>
+              <ListItemIcon>
+                <DeleteIcon fontSize="small" color="error" />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Delete Game" 
+                secondary="Permanently remove game"
+                sx={{ color: 'error.main' }}
+              />
+            </MenuItem>
+          </>
+        )}
       </Menu>
 
       {selectedGame && editDialogOpen && (
@@ -1067,12 +1262,12 @@ export default function GameList() {
         >
           <DialogTitle sx={{ 
             p: 0, 
-            position: 'relative',
+            position: 'relative', 
             overflow: 'hidden',
-            height: 120,
-            display: 'flex',
-            alignItems: 'flex-end',
-            backgroundImage: 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)'
+            height: 180,
+            backgroundImage: (theme) => theme.palette.mode === 'dark' 
+              ? 'linear-gradient(135deg, #1a237e 0%, #0d47a1 100%)' 
+              : 'linear-gradient(135deg, #6a11cb 0%, #2575fc 100%)'
           }}>
             <Box sx={{ 
               position: 'absolute', 
@@ -1105,16 +1300,26 @@ export default function GameList() {
               </Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 2 }}>
                 <Chip 
-                  icon={<LocationIcon sx={{ color: 'white !important' }} />} 
+                  icon={<LocationIcon sx={{ color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF !important' : 'white !important' }} />} 
                   label={selectedTournament.location || 'Unknown location'} 
                   size="small" 
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                  sx={{ 
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.4)' : 'rgba(255,255,255,0.2)', 
+                    color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : 'white',
+                    border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(144, 202, 249, 0.5)' : 'none',
+                    fontWeight: (theme) => theme.palette.mode === 'dark' ? 600 : 400
+                  }}
                 />
                 <Chip 
-                  icon={<TrophyIcon sx={{ color: 'white !important' }} />} 
+                  icon={<TrophyIcon sx={{ color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF !important' : 'white !important' }} />} 
                   label={selectedTournament.tournamentData?.format || 'Knockout'} 
                   size="small" 
-                  sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}
+                  sx={{ 
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.4)' : 'rgba(255,255,255,0.2)', 
+                    color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : 'white',
+                    border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(144, 202, 249, 0.5)' : 'none',
+                    fontWeight: (theme) => theme.palette.mode === 'dark' ? 600 : 400
+                  }}
                 />
               </Box>
             </Box>
@@ -1123,8 +1328,19 @@ export default function GameList() {
           <DialogContent sx={{ p: 3 }}>
             {/* Key Stats Section */}
             <Box sx={{ mb: 4 }}>
-              <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <SportsScoreIcon color="primary" /> Tournament Stats
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  mb: 2, 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 1,
+                  color: (theme) => theme.palette.mode === 'dark' ? '#000000' : theme.palette.text.primary,
+                  fontWeight: 600
+                }}
+              >
+                <SportsScoreIcon sx={{ color: (theme) => theme.palette.mode === 'dark' ? '#000000' : theme.palette.primary.main }} /> 
+                Tournament Stats
               </Typography>
               <Grid container spacing={2}>
                 {selectedTournamentHighlights.map((h,i) => (
@@ -1137,18 +1353,37 @@ export default function GameList() {
                         flexDirection: 'column', 
                         alignItems: 'center',
                         height: '100%',
-                        background: 'white',
+                        background: (theme) => theme.palette.mode === 'dark' ? '#1E1E1E' : 'white',
                         borderRadius: 2,
+                        border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
+                        boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.1)',
                         transition: 'all 0.3s',
                         '&:hover': {
                           transform: 'translateY(-5px)',
-                          boxShadow: '0 8px 16px rgba(0,0,0,0.1)'
+                          boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 8px 24px rgba(0, 0, 0, 0.6)' : '0 8px 16px rgba(0,0,0,0.1)'
                         }
                       }}
                     >
                       {highlightIconMap[h.label] || null}
-                      <Typography variant="subtitle2" color="text.secondary">{h.label}</Typography>
-                      <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>{h.value}</Typography>
+                      <Typography 
+                        variant="subtitle2" 
+                        sx={{ 
+                          color: (theme) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.text.secondary,
+                          fontWeight: 600
+                        }}
+                      >
+                        {h.label}
+                      </Typography>
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          fontWeight: 700, 
+                          mt: 1,
+                          color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.text.primary
+                        }}
+                      >
+                        {h.value}
+                      </Typography>
                     </Paper>
                   </Grid>
                 ))}
@@ -1158,10 +1393,31 @@ export default function GameList() {
             {/* Progress Bar */}
             {selectedTournament.tournamentData?.rounds?.length > 0 && (
               <Box sx={{ mb: 4 }}>
-                <Typography variant="subtitle1" sx={{ mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <CheckCircleIcon color="success" fontSize="small" /> Tournament Progress
+                <Typography 
+                  variant="subtitle1" 
+                  sx={{ 
+                    mb: 1, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    color: (theme) => theme.palette.mode === 'dark' ? '#000000' : theme.palette.text.primary,
+                    fontWeight: 600
+                  }}
+                >
+                  <CheckCircleIcon 
+                    sx={{ color: (theme) => theme.palette.mode === 'dark' ? '#000000' : theme.palette.success.main }} 
+                    fontSize="small" 
+                  /> 
+                  Tournament Progress
                 </Typography>
-                <Box sx={{ position: 'relative', height: 8, bgcolor: '#edf2f7', borderRadius: 4, overflow: 'hidden' }}>
+                <Box sx={{ 
+                  position: 'relative', 
+                  height: 8, 
+                  bgcolor: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.primary.main, 0.2) : '#edf2f7', 
+                  borderRadius: 4, 
+                  overflow: 'hidden',
+                  border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}` : 'none'
+                }}>
                   {(() => {
                     const totalMatches = selectedTournament.tournamentData.rounds.reduce(
                       (sum, r) => sum + (r.matches?.length || 0), 0
@@ -1184,10 +1440,22 @@ export default function GameList() {
                     );
                   })()} 
                 </Box>
-                <Typography variant="caption" sx={{ display: 'block', textAlign: 'right', mt: 0.5 }}>
-                  {selectedTournament.tournamentData.rounds.reduce(
-                    (sum, r) => sum + (r.matches?.filter(m => m.completed || m.winner)?.length || 0), 0
-                  )} / {selectedTournament.tournamentData.rounds.reduce(
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    display: 'block', 
+                    textAlign: 'right', 
+                    mt: 0.5,
+                    color: (theme) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.text.secondary,
+                    fontWeight: (theme) => theme.palette.mode === 'dark' ? 600 : 400,
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <Box component="span" sx={{ fontWeight: 'bold', color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.text.primary }}>
+                    {selectedTournament.tournamentData.rounds.reduce(
+                      (sum, r) => sum + (r.matches?.filter(m => m.completed || m.winner)?.length || 0), 0
+                    )}
+                  </Box> / {selectedTournament.tournamentData.rounds.reduce(
                     (sum, r) => sum + (r.matches?.length || 0), 0
                   )} matches completed
                 </Typography>
@@ -1203,8 +1471,12 @@ export default function GameList() {
                     borderRadius: 2,
                     position: 'relative',
                     overflow: 'hidden',
-                    background: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
-                    height: '100%'
+                    background: (theme) => theme.palette.mode === 'dark' 
+                      ? 'linear-gradient(135deg, #b78628 0%, #8A6E2F 50%, #c69320 100%)' 
+                      : 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)',
+                    height: '100%',
+                    border: (theme) => theme.palette.mode === 'dark' ? '1px solid #FFD700' : 'none',
+                    boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 8px 32px rgba(255, 215, 0, 0.2)' : '0 8px 32px rgba(253, 160, 133, 0.2)'
                   }}>
                     <Box sx={{ 
                       position: 'absolute', 
@@ -1226,16 +1498,48 @@ export default function GameList() {
                     }} />
                     <Box sx={{ textAlign: 'center', position: 'relative', zIndex: 2 }}>
                       <TrophyIcon sx={{ fontSize: 48, color: '#FFD700', filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.2))' }} />
-                      <Typography variant="h5" sx={{ mt: 2, mb: 1, fontWeight: 700, color: '#7D4B32' }}>Champion</Typography>
-                      <Typography variant="h6" sx={{ fontWeight: 600, color: '#7D4B32' }}>{selectedChampion.name}</Typography>
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          mt: 2, 
+                          mb: 1, 
+                          fontWeight: 700, 
+                          color: (theme) => theme.palette.mode === 'dark' ? '#000000' : '#7D4B32',
+                          textShadow: (theme) => theme.palette.mode === 'dark' ? '0 2px 4px rgba(255,215,0,0.3)' : 'none'
+                        }}
+                      >
+                        Champion
+                      </Typography>
+                      <Typography 
+                        variant="h6" 
+                        sx={{ 
+                          fontWeight: 600, 
+                          color: (theme) => theme.palette.mode === 'dark' ? '#FFD700' : '#7D4B32'
+                        }}
+                      >
+                        {selectedChampion.name}
+                      </Typography>
                       
                       <Box sx={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: 1, mt: 2 }}>
                         {selectedChampion.players?.map((p,idx) => (
                           <Chip
                             key={idx}
-                            avatar={<Avatar sx={{ bgcolor: '#7D4B32' }}>{renderPlayerName(p)[0]}</Avatar>}
+                            avatar={
+                              <Avatar sx={{ 
+                                bgcolor: (theme) => theme.palette.mode === 'dark' ? '#FFD700' : '#7D4B32',
+                                color: (theme) => theme.palette.mode === 'dark' ? '#000000' : '#FFFFFF',
+                                fontWeight: 'bold'
+                              }}>
+                                {renderPlayerName(p)[0]}
+                              </Avatar>
+                            }
                             label={renderPlayerName(p)}
-                            sx={{ bgcolor: 'rgba(255,255,255,0.7)', fontWeight: 500 }}
+                            sx={{ 
+                              bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(25, 118, 210, 0.2)' : 'rgba(255,255,255,0.7)', 
+                              color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : 'inherit',
+                              fontWeight: 500,
+                              border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255, 215, 0, 0.3)' : 'none'
+                            }}
                           />
                         ))}
                       </Box>
@@ -1246,9 +1550,29 @@ export default function GameList() {
 
               {/* Teams Section */}
               <Grid item xs={12} md={selectedChampion ? 8 : 12}>
-                <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <PeopleIcon color="primary" /> Teams & Players
+                <Paper 
+                  elevation={3} 
+                  sx={{ 
+                    p: 3, 
+                    borderRadius: 2,
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1E1E' : theme.palette.background.paper,
+                    border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
+                    boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      mb: 2, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.text.primary,
+                      fontWeight: 600
+                    }}
+                  >
+                    <PeopleIcon sx={{ color: (theme) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main }} /> 
+                    Teams & Players
                   </Typography>
                   <Grid container spacing={2}>
                     {selectedTournament.tournamentData.teams?.map((team,idx) => {
@@ -1270,8 +1594,21 @@ export default function GameList() {
                             sx={{ 
                               p: 2, 
                               position: 'relative',
-                              border: isChampion ? '2px solid #FFD700' : 'none',
-                              bgcolor: isChampion ? 'rgba(255, 215, 0, 0.05)' : 'white'
+                              border: (theme) => {
+                                if (isChampion) {
+                                  return theme.palette.mode === 'dark' ? '2px solid #FFD700' : '2px solid #FFD700';
+                                } else {
+                                  return theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none';
+                                }
+                              },
+                              bgcolor: (theme) => {
+                                if (isChampion) {
+                                  return theme.palette.mode === 'dark' ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 215, 0, 0.05)';
+                                } else {
+                                  return theme.palette.mode === 'dark' ? '#2A2A2A' : 'white';
+                                }
+                              },
+                              boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 12px rgba(0, 0, 0, 0.3)' : undefined
                             }}
                           >
                             {isChampion && (
@@ -1279,14 +1616,44 @@ export default function GameList() {
                                 <TrophyIcon sx={{ color: '#FFD700', fontSize: 20 }} />
                               </Box>
                             )}
-                            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                            <Typography 
+                              variant="subtitle1" 
+                              sx={{ 
+                                fontWeight: 600,
+                                color: (theme) => {
+                                  if (isChampion) {
+                                    return theme.palette.mode === 'dark' ? '#FFD700' : theme.palette.text.primary;
+                                  } else {
+                                    return theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.text.primary;
+                                  }
+                                }
+                              }}
+                            >
                               {team.name || `Team ${idx+1}`}
                             </Typography>
                             
                             {teamStats && (
                               <Box sx={{ display: 'flex', gap: 1, mt: 1, mb: 1 }}>
-                                <Chip size="small" label={`${teamStats.points} pts`} color="primary" />
-                                <Chip size="small" label={`${teamStats.won}W-${teamStats.drawn}D-${teamStats.lost}L`} />
+                                <Chip 
+                                  size="small" 
+                                  label={`${teamStats.points} pts`} 
+                                  sx={{ 
+                                    bgcolor: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.primary.main, 0.3) : undefined,
+                                    color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                                    fontWeight: (theme) => theme.palette.mode === 'dark' ? 600 : 400,
+                                    border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.5)}` : undefined
+                                  }}
+                                  color="primary" 
+                                />
+                                <Chip 
+                                  size="small" 
+                                  label={`${teamStats.won}W-${teamStats.drawn}D-${teamStats.lost}L`} 
+                                  sx={{ 
+                                    bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1A1A' : undefined,
+                                    color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                                    border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.grey[500], 0.3)}` : undefined
+                                  }}
+                                />
                               </Box>
                             )}
                             
@@ -1296,9 +1663,36 @@ export default function GameList() {
                                 return (
                                   <Chip
                                     key={idx}
-                                    avatar={<Avatar sx={{ bgcolor: isCurrentUser ? 'primary.main' : undefined }}>{renderPlayerName(p)[0]}</Avatar>}
+                                    avatar={
+                                      <Avatar sx={{ 
+                                        bgcolor: isCurrentUser 
+                                          ? (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.primary.main, 0.8) : theme.palette.primary.main 
+                                          : (theme) => theme.palette.mode === 'dark' ? '#333333' : undefined,
+                                        color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                                        fontWeight: 'bold'
+                                      }}>
+                                        {renderPlayerName(p)[0]}
+                                      </Avatar>
+                                    }
                                     label={renderPlayerName(p)}
                                     size="small"
+                                    sx={{
+                                      bgcolor: (theme) => {
+                                        if (theme.palette.mode === 'dark') {
+                                          return isCurrentUser ? alpha(theme.palette.primary.main, 0.3) : '#2A2A2A';
+                                        }
+                                        return undefined;
+                                      },
+                                      color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                                      border: (theme) => {
+                                        if (theme.palette.mode === 'dark') {
+                                          return isCurrentUser 
+                                            ? `1px solid ${alpha(theme.palette.primary.main, 0.7)}` 
+                                            : `1px solid ${alpha(theme.palette.grey[400], 0.5)}`;
+                                        }
+                                        return undefined;
+                                      }
+                                    }}
                                     color={isCurrentUser ? 'primary' : 'default'}
                                     variant={isCurrentUser ? 'filled' : 'outlined'}
                                   />
@@ -1315,9 +1709,29 @@ export default function GameList() {
               
               {/* Match Results Section */}
               <Grid item xs={12}>
-                <Paper elevation={3} sx={{ p: 3, borderRadius: 2 }}>
-                  <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <SportsScoreIcon color="primary" /> Recent Results
+                <Paper 
+                  elevation={3} 
+                  sx={{ 
+                    p: 3, 
+                    borderRadius: 2,
+                    bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1E1E1E' : theme.palette.background.paper,
+                    border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none',
+                    boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 20px rgba(0, 0, 0, 0.5)' : '0 4px 12px rgba(0, 0, 0, 0.1)'
+                  }}
+                >
+                  <Typography 
+                    variant="h6" 
+                    sx={{ 
+                      mb: 2, 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      gap: 1,
+                      color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.text.primary,
+                      fontWeight: 600
+                    }}
+                  >
+                    <SportsScoreIcon sx={{ color: (theme) => theme.palette.mode === 'dark' ? theme.palette.primary.light : theme.palette.primary.main }} /> 
+                    Recent Results
                   </Typography>
                   <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                     {selectedTournament.tournamentData.rounds?.flatMap((round, roundIdx) => 
@@ -1332,11 +1746,24 @@ export default function GameList() {
                             flexDirection: { xs: 'column', sm: 'row' },
                             alignItems: 'center', 
                             justifyContent: 'space-between',
-                            gap: 2 
+                            gap: 2,
+                            bgcolor: (theme) => theme.palette.mode === 'dark' ? '#1A1A1A' : theme.palette.background.paper,
+                            border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.1)}` : 'none',
+                            boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 2px 8px rgba(0, 0, 0, 0.3)' : undefined
                           }}
                         >
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <Chip size="small" color="secondary" label={round.name} />
+                            <Chip 
+                              size="small" 
+                              label={round.name} 
+                              sx={{ 
+                                bgcolor: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.secondary.main, 0.3) : undefined,
+                                color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                                fontWeight: (theme) => theme.palette.mode === 'dark' ? 600 : 400,
+                                border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.secondary.main, 0.5)}` : undefined
+                              }}
+                              color="secondary" 
+                            />
                           </Box>
                           <Box sx={{ 
                             display: 'flex', 
@@ -1346,7 +1773,21 @@ export default function GameList() {
                             justifyContent: 'center'
                           }}>
                             <Box sx={{ textAlign: 'right', width: '40%' }}>
-                              <Typography variant="subtitle2">{match.team1?.name || 'TBD'}</Typography>
+                              <Typography 
+                                variant="subtitle2" 
+                                sx={{ 
+                                  fontWeight: match.winner === 'team1' ? 700 : 500,
+                                  color: (theme) => {
+                                    if (theme.palette.mode === 'dark') {
+                                      return match.winner === 'team1' ? theme.palette.success.light : '#FFFFFF';
+                                    } else {
+                                      return match.winner === 'team1' ? theme.palette.success.main : theme.palette.text.primary;
+                                    }
+                                  }
+                                }}
+                              >
+                                {match.team1?.name || 'TBD'}
+                              </Typography>
                             </Box>
                             <Box sx={{ 
                               display: 'flex', 
@@ -1355,27 +1796,80 @@ export default function GameList() {
                               px: 2,
                               py: 1,
                               borderRadius: 1,
-                              bgcolor: 'grey.100'
+                              bgcolor: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.primary.main, 0.1) : 'grey.100',
+                              border: (theme) => theme.palette.mode === 'dark' ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}` : 'none'
                             }}>
-                              <Typography variant="h6" sx={{ fontWeight: 700, color: match.winner === 'team1' ? 'success.main' : 'text.primary' }}>
+                              <Typography 
+                                variant="h6" 
+                                sx={{ 
+                                  fontWeight: 700, 
+                                  color: (theme) => {
+                                    if (theme.palette.mode === 'dark') {
+                                      return match.winner === 'team1' ? theme.palette.success.light : '#FFFFFF';
+                                    } else {
+                                      return match.winner === 'team1' ? theme.palette.success.main : theme.palette.text.primary;
+                                    }
+                                  }
+                                }}
+                              >
                                 {match.score1 != null ? match.score1 : '-'}
                               </Typography>
-                              <Typography variant="body2" sx={{ px: 1 }}>vs</Typography>
-                              <Typography variant="h6" sx={{ fontWeight: 700, color: match.winner === 'team2' ? 'success.main' : 'text.primary' }}>
+                              <Typography 
+                                variant="body2" 
+                                sx={{ 
+                                  px: 1,
+                                  color: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.7) : theme.palette.text.secondary
+                                }}
+                              >
+                                vs
+                              </Typography>
+                              <Typography 
+                                variant="h6" 
+                                sx={{ 
+                                  fontWeight: 700, 
+                                  color: (theme) => {
+                                    if (theme.palette.mode === 'dark') {
+                                      return match.winner === 'team2' ? theme.palette.success.light : '#FFFFFF';
+                                    } else {
+                                      return match.winner === 'team2' ? theme.palette.success.main : theme.palette.text.primary;
+                                    }
+                                  }
+                                }}
+                              >
                                 {match.score2 != null ? match.score2 : '-'}
                               </Typography>
                             </Box>
                             <Box sx={{ textAlign: 'left', width: '40%' }}>
-                              <Typography variant="subtitle2">{match.team2?.name || 'TBD'}</Typography>
+                              <Typography 
+                                variant="subtitle2" 
+                                sx={{ 
+                                  fontWeight: match.winner === 'team2' ? 700 : 500,
+                                  color: (theme) => {
+                                    if (theme.palette.mode === 'dark') {
+                                      return match.winner === 'team2' ? theme.palette.success.light : '#FFFFFF';
+                                    } else {
+                                      return match.winner === 'team2' ? theme.palette.success.main : theme.palette.text.primary;
+                                    }
+                                  }
+                                }}
+                              >
+                                {match.team2?.name || 'TBD'}
+                              </Typography>
                             </Box>
                           </Box>
                           <Box>
                             {match.winner && (
                               <Chip 
-                                icon={<TrophyIcon fontSize="small" />} 
+                                icon={<TrophyIcon fontSize="small" sx={{ color: (theme) => theme.palette.mode === 'dark' ? '#FFD700' : undefined }} />} 
                                 label={`${match.winner === 'team1' ? match.team1?.name : match.team2?.name} won`}
                                 size="small"
                                 color="success"
+                                sx={{
+                                  bgcolor: (theme) => theme.palette.mode === 'dark' ? '#2A2A2A' : undefined,
+                                  color: (theme) => theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+                                  fontWeight: 600,
+                                  border: (theme) => theme.palette.mode === 'dark' ? '1px solid #FFD700' : undefined
+                                }}
                               />
                             )}
                           </Box>
@@ -1385,7 +1879,15 @@ export default function GameList() {
                     {!selectedTournament.tournamentData.rounds?.some(round => 
                       (round.matches || []).some(match => match.completed || match.winner)
                     ) && (
-                      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 3 }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          textAlign: 'center', 
+                          py: 3,
+                          color: (theme) => theme.palette.mode === 'dark' ? alpha(theme.palette.common.white, 0.7) : theme.palette.text.secondary,
+                          fontStyle: 'italic'
+                        }}
+                      >
                         No completed matches yet
                       </Typography>
                     )}

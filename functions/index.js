@@ -1,119 +1,21 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
-admin.initializeApp();
 
-// Import game notification functions
-const gameNotifications = require('./gameNotifications');
+// Initialize Firebase Admin SDK with service account
+const serviceAccount = require('./service-account.json');
 
-// Export game notification functions
-exports.checkGamesClosingSoon = gameNotifications.checkGamesClosingSoon;
-exports.onGameUpdated = gameNotifications.onGameUpdated;
-exports.onTournamentUpdated = gameNotifications.onTournamentUpdated;
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+  databaseURL: `https://${serviceAccount.project_id}.firebaseio.com`
+});
 
-// Legacy notification function - we'll keep using this implementation
-exports.onGameCreated = functions.firestore
-  .document('games/{gameId}')
-  .onCreate(async (snap, context) => {
-    try {
-      const game = snap.data();
-      const gameId = context.params.gameId;
-      
-      // Get all users except the creator
-      const usersSnapshot = await admin.firestore()
-        .collection('fcmTokens')
-        .where('userId', '!=', game.createdBy)
-        .get();
+// Import notification functions
+const notifications = require('./notifications');
 
-      if (usersSnapshot.empty) {
-        console.log('No users to notify');
-        return null;
-      }
-
-      const tokens = usersSnapshot.docs.map(doc => doc.data().token);
-      
-      // Create the notification message
-      const message = {
-        notification: {
-          title: 'New Game Available!',
-          body: `${game.location} - ${game.date} at ${game.time}`
-        },
-        data: {
-          gameId,
-          url: `/games/${gameId}`
-        },
-        webpush: {
-          notification: {
-            icon: '/logo192.png',
-            badge: '/logo192.png',
-            vibrate: [200, 100, 200],
-            requireInteraction: true,
-            actions: [
-              {
-                action: 'open',
-                title: 'View Game'
-              },
-              {
-                action: 'close',
-                title: 'Dismiss'
-              }
-            ]
-          },
-          fcmOptions: {
-            link: `https://eppspadelbot.vercel.app/games/${gameId}`
-          }
-        },
-        tokens // Send to multiple devices
-      };
-
-      // Send the notification
-      const response = await admin.messaging().sendMulticast(message);
-      console.log('Notification sent successfully:', response);
-
-      // Handle failed tokens
-      if (response.failureCount > 0) {
-        const batch = admin.firestore().batch();
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            const failedToken = tokens[idx];
-            // Find and delete failed tokens
-            admin.firestore()
-              .collection('fcmTokens')
-              .where('token', '==', failedToken)
-              .get()
-              .then(snapshot => {
-                snapshot.forEach(doc => {
-                  batch.delete(doc.ref);
-                });
-              });
-          }
-        });
-        await batch.commit();
-      }
-
-      // Store notifications in Firestore
-      const batch = admin.firestore().batch();
-      usersSnapshot.docs.forEach(userDoc => {
-        const notificationRef = admin.firestore()
-          .collection('notifications')
-          .doc();
-        
-        batch.set(notificationRef, {
-          userId: userDoc.data().userId,
-          title: 'New Game Available!',
-          body: `${game.location} - ${game.date} at ${game.time}`,
-          gameId,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
-          read: false
-        });
-      });
-      
-      await batch.commit();
-      return null;
-    } catch (error) {
-      console.error('Error sending game notification:', error);
-      return null;
-    }
-  });
+// Export notification functions
+exports.sendGameNotification = notifications.sendGameNotification;
+exports.sendDirectNotification = notifications.sendDirectNotification;
+exports.sendNotificationToAll = notifications.sendNotificationToAll;
 
 // Clean up old notifications
 exports.cleanupOldNotifications = functions.pubsub

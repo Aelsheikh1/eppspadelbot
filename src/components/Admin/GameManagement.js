@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import {
   Box,
   Typography,
@@ -63,6 +65,8 @@ export default function GameManagement() {
   const [search, setSearch] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerGame, setDrawerGame] = useState(null);
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
 
 
   useEffect(() => {
@@ -243,9 +247,26 @@ export default function GameManagement() {
 
   const filteredGames = filterGames(games);
   return (
-    <Box sx={{ p: { xs: 1, sm: 3 }, background: 'linear-gradient(120deg, #f5f7fa 0%, #c3cfe2 100%)', minHeight: '100vh' }}>
+    <Box sx={{ 
+      p: { xs: 1, sm: 3 }, 
+      background: (theme) => theme.palette.mode === 'dark'
+        ? `linear-gradient(120deg, ${alpha(theme.palette.background.default, 0.9)} 0%, ${alpha(theme.palette.background.paper, 0.8)} 100%)`
+        : 'linear-gradient(120deg, #f5f7fa 0%, #c3cfe2 100%)', 
+      minHeight: '100vh'
+    }}>
       <Box sx={{ mb: 2, display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'stretch', sm: 'center' } }}>
-        <Typography variant="h5" component="h2" sx={{ mb: { xs: 1, sm: 0 } }}>
+        <Typography 
+          variant="h5" 
+          component="h2" 
+          sx={{ 
+            mb: { xs: 1, sm: 0 },
+            color: (theme) => theme.palette.mode === 'dark' 
+              ? theme.palette.primary.light 
+              : theme.palette.primary.main,
+            fontWeight: 'bold',
+            textShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'
+          }}
+        >
           Games Management
         </Typography>
         <Button
@@ -259,11 +280,85 @@ export default function GameManagement() {
         </Button>
       </Box>
       {/* Tabs for filtering */}
-      <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
-        <Tab value="all" label="All" />
-        <Tab value="upcoming" label="Upcoming" />
-        <Tab value="past" label="Past" />
-        <Tab value="tournaments" label="Tournaments" />
+      <Tabs 
+        value={tab} 
+        onChange={(e, v) => setTab(v)} 
+        sx={{ 
+          mb: 2,
+          '& .MuiTabs-indicator': {
+            backgroundColor: (theme) => theme.palette.mode === 'dark'
+              ? theme.palette.primary.light
+              : theme.palette.primary.main,
+            height: 3,
+            borderRadius: '3px 3px 0 0',
+            boxShadow: (theme) => theme.palette.mode === 'dark'
+              ? '0 0 8px rgba(0, 0, 0, 0.3)'
+              : 'none'
+          }
+        }} 
+        variant="scrollable" 
+        scrollButtons="auto"
+      >
+        <Tab 
+          value="all" 
+          label="All" 
+          sx={{
+            color: (theme) => theme.palette.mode === 'dark' && tab === 'all'
+              ? theme.palette.primary.light
+              : undefined,
+            '&.Mui-selected': {
+              color: (theme) => theme.palette.mode === 'dark'
+                ? theme.palette.primary.light
+                : undefined,
+              fontWeight: 'bold'
+            }
+          }}
+        />
+        <Tab 
+          value="upcoming" 
+          label="Upcoming" 
+          sx={{
+            color: (theme) => theme.palette.mode === 'dark' && tab === 'upcoming'
+              ? theme.palette.primary.light
+              : undefined,
+            '&.Mui-selected': {
+              color: (theme) => theme.palette.mode === 'dark'
+                ? theme.palette.primary.light
+                : undefined,
+              fontWeight: 'bold'
+            }
+          }}
+        />
+        <Tab 
+          value="past" 
+          label="Past" 
+          sx={{
+            color: (theme) => theme.palette.mode === 'dark' && tab === 'past'
+              ? theme.palette.primary.light
+              : undefined,
+            '&.Mui-selected': {
+              color: (theme) => theme.palette.mode === 'dark'
+                ? theme.palette.primary.light
+                : undefined,
+              fontWeight: 'bold'
+            }
+          }}
+        />
+        <Tab 
+          value="tournaments" 
+          label="Tournaments" 
+          sx={{
+            color: (theme) => theme.palette.mode === 'dark' && tab === 'tournaments'
+              ? theme.palette.primary.light
+              : undefined,
+            '&.Mui-selected': {
+              color: (theme) => theme.palette.mode === 'dark'
+                ? theme.palette.primary.light
+                : undefined,
+              fontWeight: 'bold'
+            }
+          }}
+        />
       </Tabs>
       {/* Search Bar */}
       <TextField
@@ -271,20 +366,136 @@ export default function GameManagement() {
         onChange={e => setSearch(e.target.value)}
         placeholder="Search by location or player..."
         size="small"
-        sx={{ mb: 2, width: { xs: '100%', sm: 350 } }}
-        InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
+        sx={{ 
+          mb: 2, 
+          width: { xs: '100%', sm: 350 },
+          '& .MuiOutlinedInput-root': {
+            backgroundColor: (theme) => theme.palette.mode === 'dark' 
+              ? alpha(theme.palette.background.paper, 0.8) 
+              : undefined,
+            '&:hover .MuiOutlinedInput-notchedOutline': {
+              borderColor: (theme) => theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.primary.main, 0.5) 
+                : undefined
+            },
+            '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+              borderColor: (theme) => theme.palette.mode === 'dark' 
+                ? theme.palette.primary.light 
+                : undefined
+            }
+          },
+          '& .MuiInputLabel-root': {
+            color: (theme) => theme.palette.mode === 'dark' 
+              ? theme.palette.text.secondary 
+              : undefined
+          },
+          '& .MuiSvgIcon-root': {
+            color: (theme) => theme.palette.mode === 'dark' 
+              ? theme.palette.primary.light 
+              : undefined
+          }
+        }}
+        InputProps={{ 
+          startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment>,
+          sx: {
+            color: (theme) => theme.palette.mode === 'dark' 
+              ? theme.palette.text.primary 
+              : undefined
+          }
+        }}
       />
       {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-      <TableContainer component={Paper}>
-        <Table size="small">
-          <TableHead>
+      <TableContainer 
+        component={Paper}
+        sx={{
+          backgroundColor: (theme) => theme.palette.mode === 'dark' 
+            ? alpha(theme.palette.background.paper, 0.8) 
+            : theme.palette.background.paper,
+          boxShadow: (theme) => theme.palette.mode === 'dark'
+            ? '0 8px 32px rgba(0, 0, 0, 0.3)'
+            : undefined,
+          border: (theme) => theme.palette.mode === 'dark'
+            ? `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+            : 'none',
+          borderRadius: 2,
+          overflow: 'auto',
+          maxWidth: '100%',
+          overflowX: 'auto',
+          '&::-webkit-scrollbar': {
+            height: '12px',
+            width: '12px',
+            display: 'block'
+          },
+          '&::-webkit-scrollbar-track': {
+            backgroundColor: (theme) => theme.palette.mode === 'dark' 
+              ? alpha(theme.palette.background.paper, 0.5) 
+              : alpha(theme.palette.grey[200], 0.5),
+            borderRadius: '6px'
+          },
+          '&::-webkit-scrollbar-thumb': {
+            backgroundColor: (theme) => theme.palette.mode === 'dark' 
+              ? alpha(theme.palette.primary.main, 0.7) 
+              : alpha(theme.palette.primary.main, 0.4),
+            borderRadius: '6px',
+            border: '2px solid transparent',
+            backgroundClip: 'padding-box',
+            '&:hover': {
+              backgroundColor: (theme) => theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.primary.main, 0.9) 
+                : alpha(theme.palette.primary.main, 0.6)
+            }
+          }
+        }}
+      >
+        <Table size="small" sx={{ 
+          '& .MuiTableCell-root': {
+            borderColor: (theme) => theme.palette.mode === 'dark' 
+              ? alpha(theme.palette.divider, 0.5) 
+              : theme.palette.divider
+          }
+        }}>
+          <TableHead sx={{
+            backgroundColor: (theme) => theme.palette.mode === 'dark' 
+              ? alpha(theme.palette.primary.main, 0.15) 
+              : alpha(theme.palette.primary.main, 0.05)
+          }}>
             <TableRow>
-              <TableCell>Date</TableCell>
-              <TableCell>Time</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Players</TableCell>
-              <TableCell>Actions</TableCell>
+              <TableCell sx={{
+                color: (theme) => theme.palette.mode === 'dark' 
+                  ? theme.palette.primary.light 
+                  : theme.palette.primary.main,
+                fontWeight: 'bold'
+              }}>Date</TableCell>
+              <TableCell sx={{
+                color: (theme) => theme.palette.mode === 'dark' 
+                  ? theme.palette.primary.light 
+                  : theme.palette.primary.main,
+                fontWeight: 'bold'
+              }}>Time</TableCell>
+              <TableCell sx={{
+                color: (theme) => theme.palette.mode === 'dark' 
+                  ? theme.palette.primary.light 
+                  : theme.palette.primary.main,
+                fontWeight: 'bold'
+              }}>Location</TableCell>
+              <TableCell sx={{
+                color: (theme) => theme.palette.mode === 'dark' 
+                  ? theme.palette.primary.light 
+                  : theme.palette.primary.main,
+                fontWeight: 'bold'
+              }}>Status</TableCell>
+              <TableCell sx={{
+                color: (theme) => theme.palette.mode === 'dark' 
+                  ? theme.palette.primary.light 
+                  : theme.palette.primary.main,
+                fontWeight: 'bold'
+              }}>Players</TableCell>
+              <TableCell sx={{
+                color: (theme) => theme.palette.mode === 'dark' 
+                  ? theme.palette.primary.light 
+                  : theme.palette.primary.main,
+                fontWeight: 'bold'
+              }}>Actions</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

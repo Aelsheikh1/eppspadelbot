@@ -24,7 +24,7 @@
     "react-dom": "18.2.0",
     "react-router-dom": "6.11.2",
     "react-scripts": "5.0.1",
-    "react-toastify": "^11.0.2",
+    "react-toastify": "^11.0.5",
     "stream-browserify": "^3.0.0",
     "stream-http": "^3.2.0",
     "url": "^0.11.4",

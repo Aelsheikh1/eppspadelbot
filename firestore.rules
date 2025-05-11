@@ -25,7 +25,10 @@ service cloud.firestore {
     // Users collection
     match /users/{userId} {
       allow read: if isSignedIn();
-      allow write: if isCurrentUser(userId) || isAdmin();
+      // Allow updates to fcmTokens array field by any signed-in user
+      allow update: if isSignedIn() && (isCurrentUser(userId) || isAdmin() || 
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['fcmTokens', 'lastTokenUpdate'])));
+      allow create, delete: if isCurrentUser(userId) || isAdmin();
       
       // Allow FCM token updates
       match /tokens/{tokenId} {
@@ -49,23 +52,75 @@ service cloud.firestore {
 
     // Notifications collection
     match /notifications/{notificationId} {
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.recipientId == request.auth.uid
+      // Allow users to read their own notifications and admins to read all
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
+      
+      // Allow any authenticated user to create notifications
+      // This is needed for game notifications to work properly
+      allow create: if isSignedIn() && (
+        // Check if the notification is being created for the current user or by an admin
+        request.resource.data.userId == request.auth.uid || isAdmin()
       );
-      allow create: if isSignedIn();
+      
+      // Allow users to update only their own notifications (e.g., mark as read)
       allow update: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.recipientId == request.auth.uid ||
-        isAdmin()
+        resource.data.userId == request.auth.uid || isAdmin()
       );
-      allow delete: if isAdmin();
+      
+      // Allow users to delete their own notifications or admins to delete any
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || isAdmin()
+      );
     }
 
     // FCM Tokens collection
-    match /fcmTokens/{userId} {
+    match /fcmTokens/{tokenId} {
       allow read: if isSignedIn();
-      allow write: if isCurrentUser(userId);
+      // Allow any authenticated user to create or update FCM tokens
+      // This is necessary because tokens are stored by document ID, not user ID
+      allow create, update: if isSignedIn();
+      // Only allow users to delete their own tokens or admins to delete any
+      allow delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+    
+    // FCM Tests collection for diagnostics
+    match /fcmTests/{testId} {
+      allow read, write: if isSignedIn();
+    }
+    
+    // Devices collection
+    match /devices/{deviceId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Custom Notifications collection
+    match /customNotifications/{notificationId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (resource.data.senderId == request.auth.uid || isAdmin());
+    }
+    
+    // Notification Triggers collection
+    match /notificationTriggers/{triggerId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn();
+      allow delete: if isSignedIn() && (resource.data.processedBy == request.auth.uid || isAdmin());
+    }
+    
+    // User Tokens collection
+    match /userTokens/{userId} {
+      allow read: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+      allow write: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+      
+      match /tokens/{tokenId} {
+        allow read: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+        allow write: if isSignedIn() && (userId == request.auth.uid || isAdmin());
+      }
     }
   }
 }

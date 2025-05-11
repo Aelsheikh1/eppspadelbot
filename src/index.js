@@ -5,7 +5,7 @@ import App from './App';
 import reportWebVitals from './reportWebVitals';
 import { getMessaging } from 'firebase/messaging';
 import { initializeApp } from 'firebase/app';
-import { requestFcmToken } from './services/firebase';
+import { requestFcmToken, setupTokenRefresh } from './services/firebase';
 import { auth, db } from './services/firebase';
 
 // Initialize Firebase app
@@ -27,40 +27,96 @@ const initializeNotifications = async () => {
   try {
     if (isNotificationInitialized) return;
 
-    // Register service worker for notifications
+    console.log('🔔 Initializing notifications...');
+
+    // Check if notifications are supported
+    if (!('Notification' in window)) {
+      console.warn('⚠️ Notifications not supported in this browser');
+      return;
+    }
+
+    // Request notification permission if not already granted
+    if (Notification.permission !== 'granted') {
+      console.log('🔔 Requesting notification permission...');
+      const permission = await Notification.requestPermission();
+      if (permission !== 'granted') {
+        console.warn('⚠️ Notification permission denied');
+        return;
+      }
+      console.log('✅ Notification permission granted');
+    }
+    
+    // Wait for authentication to be initialized before proceeding
+    const { getAuth, onAuthStateChanged } = await import('firebase/auth');
+    const auth = getAuth();
+    
+    // Wait for auth state to be determined
+    await new Promise(resolve => {
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        unsubscribe();
+        console.log('🔔 Auth state resolved:', user ? 'User authenticated' : 'No user');
+        resolve(user);
+      });
+    });
+
+    // Check if service workers are supported
     if ('serviceWorker' in navigator) {
       try {
-        // Register service worker
-        const registration = await navigator.serviceWorker.register('/firebase-messaging-sw.js', {
-          scope: '/',
-        });
-        console.log('✅ Service Worker registered:', registration);
-
-        // Wait for service worker to be ready
-        await navigator.serviceWorker.ready;
+        // Import the service worker initialization function
+        const { initializeServiceWorker, setupTokenRefresh } = await import('./services/firebase');
+        
+        // Register service worker for notification support
+        const registration = await initializeServiceWorker();
+        console.log('✅ Service Worker registered successfully');
+        
+        // Set up token refresh monitoring
+        setupTokenRefresh();
+        console.log('✅ FCM token refresh monitoring activated');
+        
+        // Wait for the service worker to be ready
+        const swRegistration = await navigator.serviceWorker.ready;
         console.log('✅ Service Worker ready');
-
-        // Initialize Firebase Messaging
-        const messaging = getMessaging(app);
-
-        // Request permission and get FCM token
+        
+        // Request notification permission and register device
+        console.log('🔔 Setting up notifications...');
+        const { registerDevice } = await import('./services/notificationService');
+        const deviceId = await registerDevice();
+        
+        if (deviceId) {
+          console.log('✅ Device registered:', deviceId);
+          
+          // Get FCM token directly from firebase.js (our improved implementation)
+          const { requestFcmToken } = await import('./services/firebase');
+          const token = await requestFcmToken();
+          
+          if (token) {
+            console.log('✅ FCM token registered:', token.substring(0, 10) + '...');
+            
+            // Send the token to the service worker for background notifications
+            if (navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: 'UPDATE_FCM_TOKEN',
+                token: token
+              });
+              console.log('✅ FCM token sent to Service Worker');
+            }
+          } else {
+            console.warn('⚠️ Could not register FCM token');
+          }
+        } else {
+          console.warn('⚠️ Could not register device for notifications');
+        }
+        
+        // Also call the old method for compatibility
+        const { requestFcmToken } = await import('./services/firebase');
         const token = await requestFcmToken();
         if (token) {
-          console.log('✅ FCM Token obtained:', token);
-          // Store the token in localStorage
-          localStorage.setItem('fcmToken', token);
-
-          // Send token to service worker
-          registration.active.postMessage({
-            type: 'UPDATE_FCM_TOKEN',
-            token: token
-          });
+          console.log('✅ Legacy notification setup complete');
         } else {
-          console.warn('⚠️ Notification permission not granted');
+          console.warn('⚠️ Legacy notification setup failed, but this is OK');
         }
       } catch (error) {
         console.error('❌ Error registering service worker:', error);
-        throw error; // Re-throw to be caught by the outer try-catch
       }
     } else {
       console.warn('⚠️ Service Worker not supported in this browser');
@@ -70,6 +126,7 @@ const initializeNotifications = async () => {
     isNotificationInitialized = true;
   } catch (error) {
     console.error('❌ Error initializing notifications:', error);
+    console.error(error);
   }
 };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { getPlayersData } from '../../utils/playerUtils';
 import { useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '@mui/material/styles';
 import {
   Box,
   Typography,
@@ -20,7 +21,10 @@ import {
   Tabs,
   Tab,
   Divider,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {
   EmojiEvents as TrophyIcon,
   TableChart as TableChartIcon,
@@ -29,6 +33,9 @@ import {
   Sports as SportsIcon,
   Groups as GroupsIcon,
   Leaderboard as LeaderboardIcon,
+  ScreenRotation as RotationIcon,
+  Fullscreen as FullscreenIcon,
+  FullscreenExit as FullscreenExitIcon,
 } from '@mui/icons-material';
 import { db } from '../../services/firebase';
 import { doc, getDoc, onSnapshot } from 'firebase/firestore';
@@ -60,12 +67,57 @@ const getTeamColor = (index) => {
 export default function TournamentDetail() {
   const { id } = useParams();
   const { currentUser } = useAuth();
+  const theme = useTheme();
+  const isDarkMode = theme.palette.mode === 'dark';
   const [tournament, setTournament] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [tabValue, setTabValue] = useState(0);
   const [gameDetails, setGameDetails] = useState(null);
   const [playersById, setPlayersById] = useState({});
+  const [isRotated, setIsRotated] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Function to request screen rotation on mobile
+  const handleRotateScreen = () => {
+    if (typeof window !== 'undefined' && window.screen && window.screen.orientation) {
+      try {
+        if (window.screen.orientation.type.includes('portrait')) {
+          window.screen.orientation.lock('landscape')
+            .then(() => setIsRotated(true))
+            .catch(err => console.error('Could not lock screen orientation:', err));
+        } else {
+          window.screen.orientation.lock('portrait')
+            .then(() => setIsRotated(false))
+            .catch(err => console.error('Could not lock screen orientation:', err));
+        }
+      } catch (error) {
+        console.error('Screen orientation API error:', error);
+        alert('Please rotate your device manually for a better view of the tournament bracket.');
+      }
+    } else {
+      alert('Please rotate your device manually for a better view of the tournament bracket.');
+    }
+  };
+
+  // Function to toggle fullscreen
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(err => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        }).catch(err => {
+          console.error('Error attempting to exit fullscreen:', err);
+        });
+      }
+    }
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -281,12 +333,81 @@ export default function TournamentDetail() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', mt: 4, px: 2 }}>
-      <Paper elevation={3} sx={{ p: 3, borderRadius: 2, mb: 4 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <TrophyIcon sx={{ color: '#ffc107', fontSize: 32, mr: 2 }} />
-          <Typography variant="h4" component="h1" sx={{ color: '#1a237e', fontWeight: 'bold' }}>
-            {tournament.name || 'Tournament Details'}
-          </Typography>
+      <Paper 
+        elevation={isDarkMode ? 6 : 3} 
+        sx={{ 
+          p: 3, 
+          borderRadius: 2, 
+          mb: 4,
+          bgcolor: (theme) => theme.palette.mode === 'dark' 
+            ? alpha(theme.palette.background.paper, 0.8) 
+            : theme.palette.background.paper,
+          boxShadow: (theme) => theme.palette.mode === 'dark'
+            ? '0 8px 32px rgba(0, 0, 0, 0.3)'
+            : undefined,
+          border: (theme) => theme.palette.mode === 'dark'
+            ? `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+            : 'none'
+        }}
+      >
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'space-between',
+          alignItems: 'center', 
+          mb: 2,
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          gap: { xs: 2, sm: 0 }
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <TrophyIcon sx={{ 
+              color: isDarkMode ? '#FFD700' : '#ffc107', 
+              fontSize: 32, 
+              mr: 2,
+              filter: isDarkMode ? 'drop-shadow(0 0 8px rgba(255, 215, 0, 0.3))' : 'none'
+            }} />
+            <Typography variant="h4" component="h1" sx={{ 
+              color: (theme) => theme.palette.mode === 'dark' 
+                ? theme.palette.primary.light 
+                : '#1a237e', 
+              fontWeight: 'bold',
+              textShadow: isDarkMode ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'
+            }}>
+              {tournament.name || 'Tournament Details'}
+            </Typography>
+          </Box>
+          
+          {/* Mobile controls */}
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Tooltip title="Rotate screen for better view">
+              <IconButton 
+                onClick={handleRotateScreen} 
+                size="small"
+                sx={{
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                  '&:hover': {
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.2),
+                  },
+                  display: { xs: 'flex', md: 'none' }
+                }}
+              >
+                <RotationIcon />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title={isFullscreen ? "Exit fullscreen" : "View fullscreen"}>
+              <IconButton 
+                onClick={toggleFullscreen} 
+                size="small"
+                sx={{
+                  bgcolor: (theme) => alpha(theme.palette.primary.main, 0.1),
+                  '&:hover': {
+                    bgcolor: (theme) => alpha(theme.palette.primary.main, 0.2),
+                  }
+                }}
+              >
+                {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
         
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
@@ -294,35 +415,134 @@ export default function TournamentDetail() {
             icon={<SportsIcon />} 
             label={`Format: ${tournament.format}`} 
             color="primary" 
-            variant="outlined" 
+            variant={isDarkMode ? "default" : "outlined"}
+            sx={{
+              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.primary.main, 0.15)
+                : undefined,
+              border: (theme) => theme.palette.mode === 'dark'
+                ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
+                : undefined,
+              '& .MuiChip-icon': {
+                color: (theme) => theme.palette.mode === 'dark'
+                  ? theme.palette.primary.light
+                  : undefined
+              }
+            }}
           />
           <Chip 
             icon={<GroupsIcon />} 
             label={`Teams: ${tournamentData.teams.length}`} 
             color="secondary" 
-            variant="outlined" 
+            variant={isDarkMode ? "default" : "outlined"}
+            sx={{
+              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.secondary.main, 0.15)
+                : undefined,
+              border: (theme) => theme.palette.mode === 'dark'
+                ? `1px solid ${alpha(theme.palette.secondary.main, 0.3)}`
+                : undefined,
+              '& .MuiChip-icon': {
+                color: (theme) => theme.palette.mode === 'dark'
+                  ? theme.palette.secondary.light
+                  : undefined
+              }
+            }}
           />
           {tournament.status && (
             <Chip 
               icon={tournament.status === 'Completed' ? <StarIcon /> : <ScoreboardIcon />} 
               label={`Status: ${tournament.status}`} 
               color={tournament.status === 'Completed' ? 'success' : 'info'} 
-              variant="outlined" 
+              variant={isDarkMode ? "default" : "outlined"}
+              sx={{
+                bgcolor: (theme) => {
+                  if (!theme.palette.mode === 'dark') return undefined;
+                  return tournament.status === 'Completed'
+                    ? alpha(theme.palette.success.main, 0.15)
+                    : alpha(theme.palette.info.main, 0.15);
+                },
+                border: (theme) => {
+                  if (!theme.palette.mode === 'dark') return undefined;
+                  return tournament.status === 'Completed'
+                    ? `1px solid ${alpha(theme.palette.success.main, 0.3)}`
+                    : `1px solid ${alpha(theme.palette.info.main, 0.3)}`;
+                },
+                '& .MuiChip-icon': {
+                  color: (theme) => {
+                    if (!theme.palette.mode === 'dark') return undefined;
+                    return tournament.status === 'Completed'
+                      ? theme.palette.success.light
+                      : theme.palette.info.light;
+                  }
+                }
+              }}
             />
           )}
         </Box>
         
-        <Divider sx={{ mb: 3 }} />
+        <Divider sx={{ 
+          mb: 3,
+          borderColor: (theme) => theme.palette.mode === 'dark' 
+            ? alpha(theme.palette.divider, 0.5) 
+            : theme.palette.divider 
+        }} />
         
         {tournament.format.toLowerCase() === 'league' && (
-          <Box sx={{ mt: 2 }}>
+          <Box 
+            sx={{ 
+              mt: 2,
+              position: 'relative',
+              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.background.paper, 0.4) 
+                : alpha(theme.palette.background.paper, 1),
+              borderRadius: 2,
+              p: 2,
+              border: (theme) => theme.palette.mode === 'dark'
+                ? `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+                : 'none',
+              boxShadow: (theme) => theme.palette.mode === 'dark'
+                ? '0 4px 20px rgba(0, 0, 0, 0.2)'
+                : 'none',
+              transition: 'all 0.3s ease-in-out',
+              ...(isRotated && {
+                height: '80vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              })
+            }}
+          >
             {!loading && tournamentData && (
               <LeagueTable rounds={tournamentData.rounds} teams={tournamentData.teams} />
             )}
           </Box>
         )}
         {tournament.format.toLowerCase() === 'knockout' && (
-          <Box sx={{ mt: 2 }}>
+          <Box 
+            sx={{ 
+              mt: 2,
+              position: 'relative',
+              bgcolor: (theme) => theme.palette.mode === 'dark' 
+                ? alpha(theme.palette.background.paper, 0.4) 
+                : alpha(theme.palette.background.paper, 1),
+              borderRadius: 2,
+              p: 2,
+              border: (theme) => theme.palette.mode === 'dark'
+                ? `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+                : 'none',
+              boxShadow: (theme) => theme.palette.mode === 'dark'
+                ? '0 4px 20px rgba(0, 0, 0, 0.2)'
+                : 'none',
+              transition: 'all 0.3s ease-in-out',
+              ...(isRotated && {
+                height: '80vh',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              })
+            }}
+          >
             {!loading && tournamentData && (
               <TournamentVisualizerEnhanced
                 rounds={tournamentData.rounds}
@@ -331,6 +551,7 @@ export default function TournamentDetail() {
                 displayDate={tournament.date || ''}
                 displayTime={tournament.time || ''}
                 currentUserEmail={currentUser?.email || ''}
+                isDarkMode={isDarkMode}
               />
             )}
           </Box>

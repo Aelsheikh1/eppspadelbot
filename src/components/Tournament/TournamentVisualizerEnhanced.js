@@ -1,4 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTheme } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import { 
   Box, 
   Typography, 
@@ -21,7 +23,10 @@ import {
   Star as StarIcon,
   Whatshot as WhatshotIcon,
   FormatListNumbered as FormatListNumberedIcon,
-  SportsScore as SportsScoreIcon
+  SportsScore as SportsScoreIcon,
+  ScreenRotation as RotationIcon,
+  Fullscreen as FullscreenIcon,
+  FullscreenExit as FullscreenExitIcon
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import './TournamentVisualizer.css';
@@ -195,11 +200,46 @@ const additionalStyles = `
   }
 `;
 
-const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, displayTime, currentUserEmail }) => {
+const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, displayTime, currentUserEmail, isDarkMode }) => {
+  const theme = useTheme();
+  const darkMode = isDarkMode !== undefined ? isDarkMode : theme.palette.mode === 'dark';
   const iframeRef = useRef(null);
   const [highlightsData, setHighlightsData] = useState(null);
   const [champion, setChampion] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRotated, setIsRotated] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Function to toggle rotation view without using the Screen Orientation API
+  const handleRotateScreen = () => {
+    // Simply toggle the rotation state - this will apply CSS transformations instead
+    setIsRotated(!isRotated);
+    
+    // Show a helpful message the first time
+    if (!isRotated && !localStorage.getItem('rotationMessageShown')) {
+      alert('The tournament bracket view has been optimized for landscape viewing. You can toggle back to normal view by clicking the button again.');
+      localStorage.setItem('rotationMessageShown', 'true');
+    }
+  };
+
+  // Function to toggle fullscreen
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().then(() => {
+        setIsFullscreen(true);
+      }).catch(err => {
+        console.error('Error attempting to enable fullscreen:', err);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen().then(() => {
+          setIsFullscreen(false);
+        }).catch(err => {
+          console.error('Error attempting to exit fullscreen:', err);
+        });
+      }
+    }
+  };
 
   // Compute tournament highlights
   useEffect(() => {
@@ -319,12 +359,130 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
   }
 
   return (
-    <Box sx={{ width: '100%', mt: 2 }}>
+    <Box sx={{ 
+      width: '100%', 
+      mt: 2,
+      bgcolor: (theme) => darkMode 
+        ? alpha(theme.palette.background.paper, 0.4) 
+        : 'transparent',
+      borderRadius: 2,
+      p: 2,
+      border: (theme) => darkMode
+        ? `1px solid ${alpha(theme.palette.primary.main, 0.1)}`
+        : 'none',
+      boxShadow: (theme) => darkMode
+        ? '0 4px 20px rgba(0, 0, 0, 0.2)'
+        : 'none',
+    }}>
       {/* Tournament Highlights Section */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between',
+        alignItems: 'center', 
+        mb: 2,
+        flexWrap: { xs: 'wrap', sm: 'nowrap' },
+        gap: { xs: 2, sm: 0 }
+      }}>
+        <Typography 
+          variant="h5" 
+          component="h2" 
+          sx={{ 
+            color: (theme) => darkMode 
+              ? theme.palette.primary.light 
+              : theme.palette.primary.main,
+            fontWeight: 'bold',
+            textShadow: darkMode ? '0 1px 2px rgba(0,0,0,0.3)' : 'none'
+          }}
+        >
+          Tournament Bracket
+        </Typography>
+        
+        {/* Mobile controls */}
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Tooltip title="Rotate screen for better view">
+            <Paper
+              elevation={darkMode ? 4 : 2}
+              sx={{
+                bgcolor: (theme) => darkMode 
+                  ? alpha(theme.palette.primary.main, 0.2)
+                  : alpha(theme.palette.primary.main, 0.1),
+                '&:hover': {
+                  bgcolor: (theme) => darkMode
+                    ? alpha(theme.palette.primary.main, 0.3)
+                    : alpha(theme.palette.primary.main, 0.2),
+                },
+                display: { xs: 'flex', md: 'flex' },
+                p: 1,
+                borderRadius: 2,
+                cursor: 'pointer',
+                border: (theme) => darkMode
+                  ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
+                  : 'none',
+              }}
+              onClick={handleRotateScreen}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <RotationIcon sx={{ 
+                  color: (theme) => darkMode 
+                    ? theme.palette.primary.light 
+                    : theme.palette.primary.main 
+                }} />
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: (theme) => darkMode 
+                      ? theme.palette.primary.light 
+                      : theme.palette.primary.main,
+                    fontWeight: 'bold',
+                    display: { xs: 'none', sm: 'block' }
+                  }}
+                >
+                  Rotate View
+                </Typography>
+              </Box>
+            </Paper>
+          </Tooltip>
+          <Tooltip title={isFullscreen ? "Exit fullscreen" : "View fullscreen"}>
+            <Paper
+              elevation={darkMode ? 4 : 2}
+              sx={{
+                bgcolor: (theme) => darkMode 
+                  ? alpha(theme.palette.primary.main, 0.2)
+                  : alpha(theme.palette.primary.main, 0.1),
+                '&:hover': {
+                  bgcolor: (theme) => darkMode
+                    ? alpha(theme.palette.primary.main, 0.3)
+                    : alpha(theme.palette.primary.main, 0.2),
+                },
+                display: 'flex',
+                p: 1,
+                borderRadius: 2,
+                cursor: 'pointer',
+                border: (theme) => darkMode
+                  ? `1px solid ${alpha(theme.palette.primary.main, 0.3)}`
+                  : 'none',
+              }}
+              onClick={toggleFullscreen}
+            >
+              {isFullscreen ? <FullscreenExitIcon /> : <FullscreenIcon />}
+            </Paper>
+          </Tooltip>
+        </Box>
+      </Box>
+      
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
+        style={{
+          transition: 'all 0.3s ease-in-out',
+          ...(isRotated && {
+            height: '80vh',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          })
+        }}
       >
         <Paper 
           elevation={3} 
@@ -332,7 +490,9 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
             p: 3, 
             mb: 4, 
             borderRadius: 2,
-            background: 'linear-gradient(to right, #f6f9fc, #ffffff)',
+            background: (theme) => isDarkMode 
+              ? alpha(theme.palette.background.paper, 0.8)
+              : 'linear-gradient(to right, #f6f9fc, #ffffff)',
             position: 'relative',
             overflow: 'hidden'
           }}
@@ -519,11 +679,24 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
         transition={{ duration: 0.5, delay: 0.3 }}
       >
         <Paper 
-          elevation={3} 
+          elevation={darkMode ? 6 : 3} 
           sx={{ 
-            borderRadius: 2, 
-            overflow: format === 'League' ? 'hidden' : 'visible',
-            position: 'relative'
+            width: '100%', 
+            height: format === 'knockout' ? 600 : 'auto',
+            minHeight: 400,
+            overflow: 'hidden',
+            position: 'relative',
+            borderRadius: 2,
+            mb: 3,
+            bgcolor: (theme) => darkMode 
+              ? theme.palette.mode === 'dark' ? '#121212' : alpha(theme.palette.background.default, 0.9) 
+              : theme.palette.background.paper,
+            border: (theme) => darkMode
+              ? `1px solid ${alpha(theme.palette.primary.main, 0.2)}`
+              : 'none',
+            boxShadow: (theme) => darkMode
+              ? '0 8px 32px rgba(0, 0, 0, 0.3)'
+              : theme.shadows[3],
           }}
         >
           {format === 'League' && isLoading && (

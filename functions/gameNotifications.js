@@ -14,33 +14,155 @@ const messaging = admin.messaging();
  */
 const sendGameNotification = async (gameId, title, body, data = {}) => {
   try {
-    // Get the game document
-    const gameDoc = await db.collection('games').doc(gameId).get();
-    if (!gameDoc.exists) {
-      console.error(`Game ${gameId} not found`);
+    // Get game data
+    const gameRef = db.collection('games').doc(gameId);
+    const gameSnapshot = await gameRef.get();
+    
+    if (!gameSnapshot.exists) {
+      console.log(`Game ${gameId} not found`);
       return false;
     }
     
-    const gameData = gameDoc.data();
+    const gameData = gameSnapshot.data();
+    const creatorId = gameData.createdBy;
+    
+    console.log(`Processing notification for game ${gameId}, creator: ${creatorId}`);
     
     // Get all users who are registered for this game
-    const playerIds = gameData.players?.map(player => player.id) || [];
+    const playerIds = gameData.players || [];
+    console.log(`Player IDs: ${JSON.stringify(playerIds)}`);
     
-    // Add the game creator to the list if not already included
-    if (gameData.createdBy && !playerIds.includes(gameData.createdBy)) {
-      playerIds.push(gameData.createdBy);
+    // Determine which users should receive notifications based on notification type
+    let targetUserIds = [];
+    
+    if (data.type === 'gameCreated') {
+      // For game creation, we need to get all users except the creator
+      console.log('This is a gameCreated notification - targeting all users');
+      // We'll get all users in the next step
+    } else {
+      // For game updates (closing soon, closed, etc.), only notify participating players
+      console.log(`This is a ${data.type} notification - targeting only participating players`);
+      targetUserIds = playerIds;
+      console.log('Target user IDs:', targetUserIds);
+      
+      if (targetUserIds.length === 0) {
+        console.log('No target users for this notification');
+        return false;
+      }
     }
     
-    // Get FCM tokens for all players
-    const tokensSnapshot = await db.collection('users')
-      .where('uid', 'in', playerIds)
-      .get();
+    // Get FCM tokens directly from user documents
+    let userDocs = [];
     
-    const tokens = [];
-    tokensSnapshot.forEach(doc => {
-      const userData = doc.data();
-      if (userData.fcmTokens && userData.fcmTokens.length > 0) {
-        // Check notification settings
+    if (data.type === 'gameCreated') {
+      // For game creation: get all users
+      console.log('Querying all users for gameCreated notification');
+      const usersSnapshot = await db.collection('users').get();
+      userDocs = usersSnapshot.docs.filter(doc => doc.id !== creatorId); // Exclude creator
+      console.log(`Found ${userDocs.length} users (excluding creator) for game creation notification`);
+    } else {
+      // For game updates: only get participating players
+      // Handle Firestore's limit of 10 values in 'in' queries
+      if (targetUserIds.length <= 10) {
+        // Single query for 10 or fewer users
+        const usersSnapshot = await db.collection('users')
+          .where(admin.firestore.FieldPath.documentId(), 'in', targetUserIds)
+          .get();
+        userDocs = usersSnapshot.docs;
+        console.log(`Queried ${userDocs.length} specific players`);
+      } else {
+        // Multiple queries for more than 10 users
+        console.log(`Too many players (${targetUserIds.length}), using multiple queries`);
+        const queryPromises = [];
+        
+        // Split into chunks of 10
+        for (let i = 0; i < targetUserIds.length; i += 10) {
+          const chunk = targetUserIds.slice(i, i + 10);
+          queryPromises.push(
+            db.collection('users')
+              .where(admin.firestore.FieldPath.documentId(), 'in', chunk)
+              .get()
+          );
+        }
+        
+        // Execute all queries and combine results
+        const snapshots = await Promise.all(queryPromises);
+        userDocs = snapshots.flatMap(snapshot => snapshot.docs);
+        console.log(`Retrieved ${userDocs.length} users from multiple queries`);
+      }
+    }
+    
+    if (userDocs.length === 0) {
+      console.log('No users found for notification');
+      return false;
+    }
+    
+    console.log(`Found ${userDocs.length} total users to potentially notify`);
+    
+    // Create a map to collect all valid FCM tokens
+    const userTokenMap = new Map();
+    
+    // Extract FCM tokens from user documents
+    userDocs.forEach(userDoc => {
+      const userData = userDoc.data();
+      const userId = userDoc.id;
+      
+      // Skip the creator
+      if (userId === creatorId) return;
+      
+      // Skip users without FCM tokens
+      if (!userData.fcmTokens || !Array.isArray(userData.fcmTokens) || userData.fcmTokens.length === 0) {
+        console.log(`User ${userId} has no FCM tokens`);
+        return;
+      }
+      
+      // Check notification preferences if they exist
+      const notificationSettings = userData.notificationSettings || {
+        gameCreated: true,
+        gameClosingSoon: true,
+        gameClosed: true,
+        tournamentUpdates: true
+      };
+      
+      // Skip if user has disabled this notification type
+      if ((data.type === 'gameCreated' && !notificationSettings.gameCreated) ||
+          (data.type === 'gameClosingSoon' && !notificationSettings.gameClosingSoon) ||
+          (data.type === 'gameClosed' && !notificationSettings.gameClosed) ||
+          (data.type === 'tournamentUpdates' && !notificationSettings.tournamentUpdates)) {
+        console.log(`User ${userId} has disabled ${data.type} notifications`);
+        return;
+      }
+      
+      // Use the most recent token (last in the array)
+      const token = userData.fcmTokens[userData.fcmTokens.length - 1];
+      
+      if (token) {
+        userTokenMap.set(userId, {
+          token,
+          userId
+        });
+        console.log(`Added token for user ${userId}`);
+      }
+    });
+    
+    // DEBUG LOG: Print all tokens and userIds before filtering
+    console.log('DEBUG: All user tokens to consider:', Array.from(userTokenMap.values()));
+    
+    // Now collect tokens with user notification settings
+    const tokenPromises = Array.from(userTokenMap.values()).map(async (tokenData) => {
+      const userId = tokenData.userId;
+      const token = tokenData.token;
+      
+      try {
+        // Get user notification settings
+        const userDoc = await db.collection('users').doc(userId).get();
+        
+        if (!userDoc.exists) {
+          console.log(`User document not found for ${userId}`);
+          return null;
+        }
+        
+        const userData = userDoc.data();
         const notificationSettings = userData.notificationSettings || {
           gameCreated: true,
           gameClosingSoon: true,
@@ -48,26 +170,46 @@ const sendGameNotification = async (gameId, title, body, data = {}) => {
           tournamentUpdates: true
         };
         
-        // Only send notification if the user has enabled the specific type
+        // Check if this notification type is enabled for the user
         if ((data.type === 'gameCreated' && notificationSettings.gameCreated) ||
             (data.type === 'gameClosingSoon' && notificationSettings.gameClosingSoon) ||
             (data.type === 'gameClosed' && notificationSettings.gameClosed) ||
             (data.type === 'tournamentUpdates' && notificationSettings.tournamentUpdates)) {
-          tokens.push(...userData.fcmTokens);
+          console.log(`Adding token for user ${userId}`);
+          return token;
         }
+      } catch (error) {
+        console.error(`Error processing user ${userId}:`, error);
       }
+      
+      return null;
     });
     
-    if (tokens.length === 0) {
+    // Wait for all promises to resolve and filter out null values
+    const tokens = (await Promise.all(tokenPromises)).filter(token => token !== null);
+    
+    // Remove any duplicate tokens that might still exist
+    const uniqueTokens = [...new Set(tokens)];
+
+    // DEBUG LOG: Print unique tokens and intended recipients
+    console.log('DEBUG: Unique tokens to send notification to:', uniqueTokens);
+    console.log('DEBUG: Notification payload:', { title, body, data });
+    console.log('DEBUG: Player IDs:', playerIds);
+    console.log('DEBUG: Creator/admin ID:', creatorId);
+    
+    if (uniqueTokens.length === 0) {
       console.log(`No valid FCM tokens found for game ${gameId}`);
       return false;
     }
     
-    // Prepare the notification message
+    // Prepare the notification message with enhanced configuration for popup notifications
     const message = {
       notification: {
         title,
-        body
+        body,
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        tag: `game-${gameId}`
       },
       data: {
         ...data,
@@ -75,21 +217,87 @@ const sendGameNotification = async (gameId, title, body, data = {}) => {
         gameName: gameData.name || '',
         gameDate: gameData.date || '',
         gameTime: gameData.time || '',
-        clickAction: 'FLUTTER_NOTIFICATION_CLICK'
+        clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+        // Include notification content in data payload for service worker
+        title,
+        body,
+        forcePopup: 'true'
       },
-      tokens
+      // Set high priority for better popup chances
+      android: {
+        priority: 'high',
+        notification: {
+          clickAction: 'FLUTTER_NOTIFICATION_CLICK',
+          icon: '/logo192.png',
+          priority: 'max',
+          channelId: 'game_notifications'
+        }
+      },
+      // Set critical priority for iOS
+      apns: {
+        payload: {
+          aps: {
+            sound: 'default',
+            badge: 1,
+            contentAvailable: true,
+            mutableContent: true,
+            priority: 10
+          }
+        },
+        headers: {
+          'apns-priority': '10',
+          'apns-push-type': 'alert'
+        }
+      },
+      // Set web push specific options
+      webpush: {
+        notification: {
+          icon: '/logo192.png',
+          badge: '/logo192.png',
+          vibrate: [200, 100, 200],
+          requireInteraction: true,
+          actions: [
+            {
+              action: 'view',
+              title: 'View Game'
+            },
+            {
+              action: 'close',
+              title: 'Dismiss'
+            }
+          ]
+        },
+        fcmOptions: {
+          link: `/games/${gameId}`
+        },
+        headers: {
+          TTL: '86400',
+          Urgency: 'high'
+        }
+      },
+      tokens: uniqueTokens
     };
+
+    // DEBUG LOG: Message before sending
+    console.log('DEBUG: Sending FCM message:', JSON.stringify(message, null, 2));
     
-    // Send the notification
-    const response = await messaging.sendMulticast(message);
+    // Send the notification using the new recommended method instead of deprecated sendMulticast
+    const response = await messaging.sendEachForMulticast(message);
     console.log(`Notifications sent for game ${gameId}:`, response.successCount, 'successful,', response.failureCount, 'failed');
+    console.log('DEBUG: FCM response:', response);
     
     // Log the notification in Firestore
     await db.collection('notifications').add({
       title,
       body,
       data: message.data,
-      sentTo: playerIds,
+      type: data.type || 'unknown',
+      gameId: gameId,
+      creatorId: creatorId,
+      // For sentTo, use the actual recipients based on notification type
+      sentTo: data.type === 'gameCreated' 
+        ? 'all_users_except_creator' // For game creation, we notified all users
+        : playerIds.filter(id => id !== creatorId), // For game updates, only participating players
       successCount: response.successCount,
       failureCount: response.failureCount,
       timestamp: admin.firestore.FieldValue.serverTimestamp()
@@ -117,7 +325,15 @@ exports.onGameCreated = functions.firestore
     const title = 'New Game Available';
     const body = `A new game "${gameData.name}" has been created for ${gameData.date} at ${gameData.time}`;
     
-    await sendGameNotification(gameId, title, body, { type: 'gameCreated' });
+    // Track the source of the notification as the game creator
+    // This ensures the creator doesn't get notified about their own action
+    const sourceData = {
+      type: 'gameCreated',
+      sourceUserId: gameData.createdBy, // Add the creator ID as the source
+      sourceType: 'creator'
+    };
+    
+    await sendGameNotification(gameId, title, body, sourceData);
     return null;
   });
 

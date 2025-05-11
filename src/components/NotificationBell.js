@@ -1,24 +1,116 @@
-import React, { useEffect, useState } from 'react';
-import { 
-  Badge, 
-  IconButton, 
-  Menu, 
-  MenuItem, 
-  Typography, 
-  Snackbar, 
-  Button, 
-  Divider,
-  Box,
-  Tooltip
-} from '@mui/material';
+import React, { useState, useEffect, useRef } from 'react';
+import { Badge, IconButton, Menu, MenuItem, Typography, Box, Divider, List, ListItem, ListItemText, Button, Snackbar, Alert, Tooltip, Drawer, Card, CardContent, CardActions, Chip } from '@mui/material';
 import NotificationsIcon from '@mui/icons-material/Notifications';
+import MarkEmailReadIcon from '@mui/icons-material/MarkEmailRead';
 import DeleteIcon from '@mui/icons-material/Delete';
-import DoneAllIcon from '@mui/icons-material/DoneAll';
 import CloseIcon from '@mui/icons-material/Close';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
 import { formatDistanceToNow } from 'date-fns';
-
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
+
+// Helper function to safely format dates
+const getFormattedDate = (timestamp) => {
+  try {
+    if (!timestamp) return 'Unknown date';
+    
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp:', timestamp);
+      return 'Invalid date';
+    }
+    
+    return formatDistanceToNow(date, { addSuffix: true });
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Date error';
+  }
+};
+
+// Set to track shown notifications to prevent duplicates
+const shownNotifications = new Set();
+
+// Function to show browser notification
+const showBrowserNotification = (notification) => {
+  try {
+    // Request permission if not granted
+    if (Notification.permission !== 'granted') {
+      Notification.requestPermission().then(permission => {
+        if (permission === 'granted') {
+          displayNotification(notification);
+        }
+      });
+    } else {
+      displayNotification(notification);
+    }
+  } catch (error) {
+    console.error('Error showing browser notification:', error);
+  }
+};
+
+// Function to display the actual notification
+const displayNotification = (notification) => {
+  try {
+    // Create a notification ID
+    const uniqueId = `notification-${notification.id}-${Date.now()}`;
+    
+    // Check for duplicates
+    const dedupeKey = `${notification.id}-${notification.title}`;
+    if (shownNotifications.has(dedupeKey)) {
+      console.log('Skipping duplicate notification:', notification.title);
+      return;
+    }
+    
+    // Add to shown notifications
+    shownNotifications.add(dedupeKey);
+    
+    // Create notification options with dark theme styling
+    const options = {
+      body: notification.body || 'You have a new notification',
+      icon: '/logo192.png',
+      badge: '/logo192.png',
+      tag: uniqueId,
+      requireInteraction: true,
+      vibrate: [200, 100, 200],
+      data: {
+        url: notification.data?.url || '/',
+        gameId: notification.data?.gameId || null,
+        timestamp: Date.now(),
+        notificationId: notification.id,
+        // Add dark theme styling information
+        style: notification.data?.style || {
+          background: '#2A2A2A', // Darker background as per user preference
+          color: '#FFFFFF',     // White text for better readability
+          borderRadius: '8px',
+          padding: '16px',
+        }
+      }
+    };
+    
+    // Create and show notification
+    const browserNotification = new Notification(
+      notification.title || 'New Notification',
+      options
+    );
+    
+    // Add click handler
+    browserNotification.onclick = () => {
+      browserNotification.close();
+      window.focus();
+      
+      // Navigate to URL if provided
+      if (notification.data?.url) {
+        window.location.href = notification.data.url;
+      }
+    };
+    
+    console.log('Browser notification displayed:', notification.title);
+  } catch (error) {
+    console.error('Error displaying notification:', error);
+  }
+};
 
 export default function NotificationBell() {
   const navigate = useNavigate();
@@ -61,11 +153,45 @@ export default function NotificationBell() {
                 return { 
                   id: docSnap.id, 
                   ...notificationData,
-                  formattedDate: formatDistanceToNow(notificationData.createdAt?.toDate(), { addSuffix: true })
+                  formattedDate: getFormattedDate(notificationData.createdAt)
                 };
               });
               
               console.log(`Fetched ${notifs.length} notifications for user:`, uid);
+              
+              // Check for unread notifications that need popups
+              const newNotifs = notifs.filter(notif => 
+                notif.showPopup === true && 
+                !notif.read && 
+                !notif.popupShown
+              );
+              
+              // Show popups for new notifications
+              if (newNotifs.length > 0) {
+                console.log(`Showing ${newNotifs.length} popup notifications`);
+                
+                // For each notification, show it and store the shown state locally
+                const shownIds = new Set();
+                newNotifs.forEach(notif => {
+                  // Show the notification as a browser notification
+                  showBrowserNotification(notif);
+                  
+                  // Add to local tracking to prevent showing again
+                  shownIds.add(notif.id);
+                });
+                
+                // Update the notifications in the state to mark them as shown locally
+                // instead of trying to write to Firestore which may cause permission issues
+                setNotifications(currentNotifs => {
+                  return currentNotifs.map(notif => {
+                    if (shownIds.has(notif.id)) {
+                      return { ...notif, popupShown: true };
+                    }
+                    return notif;
+                  });
+                });
+              }
+              
               setNotifications(notifs);
             }, 
             (error) => {
@@ -278,6 +404,83 @@ export default function NotificationBell() {
     }
   };
 
+  // Function to show browser notifications
+  const showBrowserNotification = (notification) => {
+    try {
+      if (!('Notification' in window)) {
+        console.warn('Browser notifications not supported');
+        return;
+      }
+
+      if (Notification.permission !== 'granted') {
+        console.warn('Notification permission not granted');
+        return;
+      }
+      
+      // Create a unique ID for deduplication
+      const dedupeKey = `${notification.id}-${notification.title}`;
+      if (shownNotifications.has(dedupeKey)) {
+        console.log('Skipping duplicate browser notification:', notification.title);
+        return;
+      }
+      
+      // Add to shown notifications set
+      shownNotifications.add(dedupeKey);
+
+      // Log the notification data for debugging
+      console.log('Showing popup notification:', notification);
+
+      // Prepare notification data with dark theme styling
+      const title = notification.title || 'New Notification';
+      const options = {
+        body: notification.body || 'You have a new notification',
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        tag: notification.id || 'notification',
+        data: {
+          ...(notification.data || {}),
+          // Add dark theme styling information
+          style: notification.data?.style || {
+            background: '#2A2A2A', // Darker background as per user preference
+            color: '#FFFFFF',     // White text for better readability
+            borderRadius: '8px',
+            padding: '16px',
+          }
+        },
+        // Better styling with dark mode support
+        silent: false, // Allow sound
+        requireInteraction: true, // Keep notification visible until user interacts
+        vibrate: [200, 100, 200] // Vibration pattern for mobile devices
+      };
+
+      // Create and show the notification
+      const browserNotification = new Notification(title, options);
+
+      // Handle notification click
+      browserNotification.onclick = () => {
+        console.log('Browser notification clicked:', notification);
+        browserNotification.close();
+        window.focus();
+
+        // Mark as read when clicked
+        markNotificationAsRead(notification.id).catch(error => {
+          console.error('Error marking notification as read:', error);
+        });
+
+        // Navigate to appropriate page
+        const link = notification.data?.url || 
+                    (notification.data?.gameId ? `/games/${notification.data.gameId}` : null) ||
+                    (notification.gameId ? `/games/${notification.gameId}` : null);
+
+        if (link) {
+          window.location.href = link;
+        }
+      };
+    } catch (error) {
+      console.error('Error showing browser notification:', error);
+    }
+  };
+
   const unreadCount = notifications.filter(n => !n.read).length;
   console.log('Unread notifications count:', unreadCount);
 
@@ -367,7 +570,7 @@ export default function NotificationBell() {
               </Typography>
               <Typography variant="caption" color="text.secondary">
                 {notification.createdAt?.toDate 
-                  ? formatDistanceToNow(notification.createdAt.toDate(), { addSuffix: true })
+                  ? getFormattedDate(notification.createdAt)
                   : 'Just now'}
               </Typography>
               

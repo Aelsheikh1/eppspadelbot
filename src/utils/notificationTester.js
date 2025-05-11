@@ -1,4 +1,3 @@
-
 import { db } from '../services/firebase';
 import { doc, getDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
@@ -72,18 +71,7 @@ export const testNotification = async (type = 'gameCreated') => {
     
     // Display a notification using the Notifications API
     if ('Notification' in window && Notification.permission === 'granted') {
-      const notification = new Notification(title, {
-        body,
-        icon: '/logo192.png',
-        badge: '/logo192.png',
-        data
-      });
-      
-      notification.onclick = function() {
-        console.log('Notification clicked', data);
-        window.focus();
-        this.close();
-      };
+      alert(`${title}\n${body}`);
       
       // Store notification in Firestore with unique ID
       const notificationsRef = collection(db, 'notifications');

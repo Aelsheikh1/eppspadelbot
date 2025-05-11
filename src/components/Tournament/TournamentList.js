@@ -31,7 +31,8 @@ import {
   ListItemText,
   ListItemAvatar,
   Checkbox,
-  Divider
+  Divider,
+  alpha
 } from '@mui/material';
 import {
   EmojiEvents as TrophyIcon,
@@ -48,7 +49,8 @@ import {
 import { collection, query, where, getDocs, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
-import { format, formatDistanceToNow, parseISO } from 'date-fns';
+import { format } from 'date-fns';
+import { safeFormatDate, safeFormatDistanceToNow } from '../../utils/dateUtils';
 import ConvertGameToTournament from './ConvertGameToTournament';
 
 export default function TournamentList() {
@@ -357,8 +359,12 @@ export default function TournamentList() {
       ) : (
         <Grid container spacing={3}>
         {tournaments.map(tournament => {
-          const startDate = parseISO(tournament.startDate);
-          const timeToStart = formatDistanceToNow(startDate, { addSuffix: true });
+          // Use our safe utility function to format the time until tournament starts
+          const timeToStart = safeFormatDistanceToNow(
+            tournament.startDate,
+            { addSuffix: true },
+            'Date not set'
+          );
 
           return (
             <Grid item xs={12} sm={6} md={4} key={tournament.id}>
@@ -367,8 +373,20 @@ export default function TournamentList() {
                   height: '100%', 
                   display: 'flex', 
                   flexDirection: 'column',
+                  background: (theme) => `linear-gradient(135deg, 
+                    ${theme.palette.background.card} 0%, 
+                    ${alpha(theme.palette.primary.dark, 0.15)} 100%)`,
+                  boxShadow: '0 4px 20px 0 rgba(0, 0, 0, 0.5)',
+                  border: '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: { xs: 2, sm: 3 },
+                  overflow: 'visible',
                   '&:hover': {
-                    boxShadow: 6,
+                    boxShadow: '0 8px 25px 0 rgba(0, 0, 0, 0.6)',
+                    transform: 'translateY(-4px)',
+                    transition: 'transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out',
+                    background: (theme) => `linear-gradient(135deg, 
+                      ${theme.palette.background.card} 0%, 
+                      ${alpha(theme.palette.primary.dark, 0.25)} 100%)`,
                   }
                 }}
               >
@@ -420,24 +438,48 @@ export default function TournamentList() {
                           label={isCompleted ? 'Completed' : 'Ongoing'} 
                           color={isCompleted ? 'success' : 'primary'} 
                           size="small" 
-                          sx={{ width: 'fit-content', mb: isCompleted ? 1 : 0 }}
+                          sx={{ 
+                            width: 'fit-content', 
+                            mb: isCompleted ? 1 : 0,
+                            background: (theme) => isCompleted 
+                              ? `linear-gradient(135deg, ${theme.palette.success.dark} 30%, ${theme.palette.success.main} 90%)`
+                              : `linear-gradient(135deg, ${theme.palette.primary.dark} 30%, ${theme.palette.primary.main} 90%)`,
+                            boxShadow: (theme) => isCompleted 
+                              ? '0 2px 6px 0 rgba(102, 187, 106, 0.4)'
+                              : '0 2px 6px 0 rgba(92, 107, 192, 0.4)',
+                            border: (theme) => isCompleted 
+                              ? '1px solid rgba(102, 187, 106, 0.5)'
+                              : '1px solid rgba(92, 107, 192, 0.5)',
+                            fontWeight: 'medium',
+                            '& .MuiChip-label': {
+                              color: (theme) => theme.palette.mode === 'dark' ? '#fff' : isCompleted ? '#fff' : '#fff',
+                            }
+                          }}
                         />
                         {isCompleted && winnerTeam && (
                           <Box sx={{
                             display: 'flex',
                             flexDirection: 'column',
                             alignItems: 'flex-start',
-                            bgcolor: 'rgba(255, 249, 196, 0.7)',
+                            bgcolor: (theme) => theme.palette.mode === 'dark' ? 'rgba(255, 215, 0, 0.15)' : 'rgba(255, 249, 196, 0.7)',
                             borderRadius: 2,
-                            p: 1.2,
+                            p: 1.5,
                             mt: 1.2,
                             mb: 0.5,
-                            boxShadow: 1,
+                            boxShadow: (theme) => theme.palette.mode === 'dark' ? '0 4px 12px rgba(255, 215, 0, 0.2)' : 1,
                             minWidth: 0,
+                            border: (theme) => theme.palette.mode === 'dark' ? '1px solid rgba(255, 215, 0, 0.3)' : 'none',
                           }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
                               <TrophyIcon sx={{ color: 'gold', fontSize: 28, mr: 1 }} />
-                              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: '#7c6f3f', fontSize: '1.07rem', mr: 1, wordBreak: 'break-word' }}>
+                              <Typography variant="subtitle1" sx={{ 
+                                fontWeight: 700, 
+                                color: (theme) => theme.palette.mode === 'dark' ? '#ffd700' : '#7c6f3f', 
+                                fontSize: '1.07rem', 
+                                mr: 1, 
+                                wordBreak: 'break-word',
+                                textShadow: (theme) => theme.palette.mode === 'dark' ? '0 1px 2px rgba(0, 0, 0, 0.5)' : 'none'
+                              }}>
                                 {winnerTeam.name}
                               </Typography>
                             </Box>
@@ -474,7 +516,23 @@ export default function TournamentList() {
                     variant="contained"
                     color="primary"
                     onClick={() => navigate(tournament.source === 'games' ? `/games/${tournament.id}` : `/tournaments/${tournament.id}`)}
-                    sx={{ flexGrow: 1 }}
+                    sx={{ 
+                      flexGrow: 1,
+                      background: (theme) => theme.palette.mode === 'dark' 
+                        ? `linear-gradient(135deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`
+                        : `linear-gradient(135deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
+                      color: '#ffffff',
+                      fontWeight: 700,
+                      letterSpacing: '0.5px',
+                      '&:hover': {
+                        background: (theme) => theme.palette.mode === 'dark'
+                          ? `linear-gradient(135deg, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 90%)`
+                          : `linear-gradient(135deg, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 90%)`,
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px 0 rgba(121, 134, 203, 0.6)'
+                      },
+                      boxShadow: '0 2px 8px 0 rgba(121, 134, 203, 0.5)'
+                    }}
                   >
                     View Tournament
                   </Button>
@@ -482,7 +540,20 @@ export default function TournamentList() {
                     variant="outlined"
                     color="secondary"
                     onClick={() => handleShareTournament(tournament.id)}
-                    sx={{ ml: 1 }}
+                    sx={{ 
+                      ml: 1,
+                      borderColor: (theme) => theme.palette.mode === 'dark' ? '#64b5f6' : theme.palette.secondary.main,
+                      color: (theme) => theme.palette.mode === 'dark' ? '#64b5f6' : theme.palette.secondary.main,
+                      borderWidth: (theme) => theme.palette.mode === 'dark' ? '2px' : '1px',
+                      fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
+                      '&:hover': {
+                        borderColor: (theme) => theme.palette.mode === 'dark' ? '#9be7ff' : theme.palette.secondary.light,
+                        color: (theme) => theme.palette.mode === 'dark' ? '#9be7ff' : theme.palette.secondary.light,
+                        transform: 'translateY(-2px)',
+                        boxShadow: '0 4px 12px 0 rgba(100, 181, 246, 0.4)',
+                        backgroundColor: (theme) => theme.palette.mode === 'dark' ? 'rgba(100, 181, 246, 0.1)' : undefined
+                      }
+                    }}
                     startIcon={<ShareIcon />}
                   >
                     Share
@@ -494,7 +565,14 @@ export default function TournamentList() {
                         setTournamentToDelete(tournament);
                         setDeleteConfirmOpen(true);
                       }}
-                      sx={{ ml: 1 }}
+                      sx={{ 
+                        ml: 1,
+                        bgcolor: (theme) => alpha(theme.palette.error.main, 0.1),
+                        '&:hover': {
+                          bgcolor: (theme) => alpha(theme.palette.error.main, 0.2),
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
                       size="small"
                     >
                       <DeleteIcon />
@@ -527,7 +605,16 @@ export default function TournamentList() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteConfirmOpen(false)} disabled={loading}>
+          <Button 
+            onClick={() => setDeleteConfirmOpen(false)} 
+            disabled={loading}
+            sx={{
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px 0 rgba(0, 0, 0, 0.2)'
+              }
+            }}
+          >
             Cancel
           </Button>
           <Button 
@@ -535,6 +622,19 @@ export default function TournamentList() {
             color="error" 
             disabled={loading}
             startIcon={loading ? <CircularProgress size={20} /> : <DeleteIcon />}
+            sx={{
+              background: (theme) => theme.palette.mode === 'dark' 
+                ? `linear-gradient(135deg, ${theme.palette.error.dark} 30%, ${theme.palette.error.main} 90%)`
+                : undefined,
+              '&:hover': {
+                background: (theme) => theme.palette.mode === 'dark' 
+                  ? `linear-gradient(135deg, ${theme.palette.error.main} 30%, ${theme.palette.error.light} 90%)`
+                  : undefined,
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px 0 rgba(244, 67, 54, 0.4)'
+              },
+              boxShadow: '0 2px 8px 0 rgba(244, 67, 54, 0.3)'
+            }}
           >
             {loading ? 'Deleting...' : 'Delete'}
           </Button>
@@ -610,7 +710,15 @@ export default function TournamentList() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateTournamentOpen(false)}>
+          <Button 
+            onClick={() => setCreateTournamentOpen(false)}
+            sx={{
+              '&:hover': {
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px 0 rgba(0, 0, 0, 0.2)'
+              }
+            }}
+          >
             Cancel
           </Button>
           <Button 
@@ -618,6 +726,18 @@ export default function TournamentList() {
             variant="contained" 
             color="primary"
             disabled={!selectedGameId}
+            sx={{ 
+              background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
+              '&:hover': {
+                background: (theme) => `linear-gradient(135deg, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 90%)`,
+                transform: 'translateY(-2px)',
+                boxShadow: '0 4px 12px 0 rgba(92, 107, 192, 0.5)'
+              },
+              boxShadow: '0 2px 8px 0 rgba(92, 107, 192, 0.4)',
+              '&.Mui-disabled': {
+                background: (theme) => theme.palette.mode === 'dark' ? 'rgba(92, 107, 192, 0.2)' : undefined
+              }
+            }}
           >
             Next
           </Button>

@@ -1,106 +1,161 @@
-import { 
-  collection, 
-  addDoc, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  getDoc,
-  updateDoc,
-  serverTimestamp
-} from 'firebase/firestore';
 import { db } from '../services/firebase';
+import { collection, addDoc, query, where, getDocs, doc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { sendFCMNotification } from './fcmNotifications';
+import { format } from 'date-fns';
 
 /**
- * Send notifications to users about game-related events
- * @param {string} type - Type of notification (gameClosingSoon, gameConfirmation, gameClosed)
- * @param {Object} gameData - Details of the game
- * @param {string[]} [specificUserIds] - Optional list of specific user IDs to notify
+ * Send a notification for a game event
+ * @param {string} type - Type of notification (gameCreated, gameJoined, gameClosed, gameClosingSoon, gameConfirmation)
+ * @param {Object} gameData - Game data
+ * @param {Array} specificUserIds - Optional array of specific user IDs to notify
  */
 export const sendGameNotification = async (type, gameData, specificUserIds = null) => {
   try {
-    // Prepare notification details based on type
-    let notificationDetails;
+    // Create notification content based on type
+    let notificationDetails = {
+      title: '',
+      body: '',
+      type,
+      showPopup: true,
+      data: {
+        gameId: gameData.id,
+        url: `/games/${gameData.id}`
+      }
+    };
+
     switch (type) {
-      case 'gameClosingSoon':
-        notificationDetails = {
-          title: 'Game Registration Closing Soon',
-          body: `Registration for the game at ${gameData.location} on ${gameData.date} closes in ${gameData.hoursRemaining} hours.`,
-          type: 'gameClosingSoon'
-        };
+      case 'gameCreated':
+        notificationDetails.title = 'New Game Available';
+        notificationDetails.body = `A new game has been created at ${gameData.location} on ${gameData.formattedDate || gameData.date} at ${gameData.time}.`;
         break;
+      case 'gameJoined':
       case 'gameConfirmation':
-        notificationDetails = {
-          title: 'Game Registration Confirmed',
-          body: `You are registered for the game at ${gameData.location} on ${gameData.date} at ${gameData.time}. See you on the court!`,
-          type: 'gameConfirmation'
-        };
+        notificationDetails.title = 'Game Registration Confirmed';
+        notificationDetails.body = `You are registered for the game at ${gameData.location} on ${gameData.formattedDate || gameData.date} at ${gameData.time}. See you on the court!`;
+        notificationDetails.type = 'gameConfirmation';
         break;
       case 'gameClosed':
-        notificationDetails = {
-          title: 'Game Registration Closed',
-          body: `Registration for the game at ${gameData.location} on ${gameData.date} is now closed.`,
-          type: 'gameClosed'
-        };
+        notificationDetails.title = 'Game Registration Closed';
+        notificationDetails.body = `Registration for the game at ${gameData.location} on ${gameData.formattedDate || gameData.date} is now closed.`;
+        break;
+      case 'gameClosingSoon':
+        notificationDetails.title = 'Game Closing Soon';
+        notificationDetails.body = `Registration for the game at ${gameData.location} on ${gameData.formattedDate || gameData.date} closes in ${gameData.hoursRemaining} hours`;
         break;
       default:
-        throw new Error(`Unsupported notification type: ${type}`);
+        throw new Error(`Unknown notification type: ${type}`);
     }
 
-    // Determine users to notify
+    // Determine which users to notify
+    let userIds = [];
     const usersRef = collection(db, 'users');
     let usersQuery;
-    
-    if (specificUserIds) {
-      // If specific user IDs are provided, use them
-      usersQuery = query(
-        usersRef, 
-        where('__name__', 'in', specificUserIds)
-      );
+
+    if (specificUserIds && specificUserIds.length > 0) {
+      // Use the specific user IDs provided
+      userIds = specificUserIds;
     } else {
-      // Otherwise, query users who have this type of notification enabled
-      usersQuery = query(
-        usersRef, 
-        where(`notificationSettings.${type}`, '!=', false)
-      );
+      // Query users based on notification type
+      // For all notification types, get users who haven't explicitly disabled notifications
+      usersQuery = query(usersRef, where('notificationSettings.gameCreated', '!=', false));
+      
+      // If no notification settings exist, the user will still get notifications by default
+
+      const usersSnapshot = await getDocs(usersQuery);
+      userIds = usersSnapshot.docs.map(doc => doc.id);
     }
 
-    const usersSnapshot = await getDocs(usersQuery);
+    if (userIds.length === 0) {
+      console.log('No users found to notify');
+      return false;
+    }
+
+    console.log(`Sending notifications to ${userIds.length} users`);
 
     // Create notifications for each user
     const notificationsRef = collection(db, 'notifications');
-    const notificationPromises = usersSnapshot.docs.map(async (userDoc) => {
-      const userId = userDoc.id;
+    const notificationPromises = userIds.map(async (userId) => {
+      // Create the notification without checking for duplicates
+      // This ensures notifications are always created and avoids permission issues
 
-      // Create notification document
-      const gameId = gameData.id;
-      const gameLink = `/games/${gameId}`; // Consistent route for game details
-        
-      await addDoc(notificationsRef, {
-        userId,
-        title: notificationDetails.title,
-        body: notificationDetails.body,
-        type: notificationDetails.type,
-        data: {
-          gameId,
-          location: gameData.location,
-          date: gameData.date,
-          time: gameData.time,
-          link: gameLink // Consistent link generation
-        },
-        link: gameLink, // Duplicate link for easier access
-        read: false,
-        createdAt: serverTimestamp()
-      });
+      try {
+        // Create the notification without duplicate checking
+        return await addDoc(notificationsRef, {
+          userId,
+          title: notificationDetails.title,
+          body: notificationDetails.body,
+          type: notificationDetails.type,
+          data: {
+            gameId: gameData.id,
+            location: gameData.location,
+            date: gameData.date,
+            time: gameData.time,
+            url: `/games/${gameData.id}`,
+            style: {
+              background: '#2A2A2A',
+              color: '#FFFFFF',
+              borderRadius: '8px',
+              padding: '16px',
+            }
+          },
+          read: false,
+          createdAt: serverTimestamp(),
+          showPopup: notificationDetails.showPopup
+        });
+      } catch (error) {
+        console.error(`Error creating notification for user ${userId}:`, error);
+        return null;
+      }
     });
 
-    // Wait for all notifications to be created
-    await Promise.all(notificationPromises);
+    // Send FCM notifications to all users
+    if (userIds.length > 0) {
+      await sendFCMNotification(userIds, {
+        title: notificationDetails.title,
+        body: notificationDetails.body,
+        data: notificationDetails.data
+      });
+    }
 
-    console.log(`Sent ${type} notifications for game ${gameData.id}`);
+    // Wait for all notifications to be created
+    const results = await Promise.all(notificationPromises);
+    const successCount = results.filter(result => result !== null).length;
+
+    console.log(`Successfully sent ${type} notifications to ${successCount} users`);
     return true;
   } catch (error) {
     console.error(`Error sending ${type} notifications:`, error);
+    return false;
+  }
+};
+
+/**
+ * Send a confirmation notification to a user when they join a game
+ * @param {string} userId - ID of the user who joined
+ * @param {string} gameId - ID of the game they joined
+ */
+export const sendGameRegistrationConfirmation = async (userId, gameId) => {
+  try {
+    const gameRef = doc(db, 'games', gameId);
+    const gameDoc = await getDoc(gameRef);
+
+    if (!gameDoc.exists()) {
+      throw new Error('Game not found');
+    }
+
+    const game = gameDoc.data();
+    const gameDate = new Date(`${game.date}T${game.time}`);
+    const formattedDate = format(gameDate, 'MMMM do, yyyy');
+
+    await sendGameNotification('gameConfirmation', {
+      id: gameId,
+      ...game,
+      formattedDate
+    }, [userId]);
+
+    return true;
+  } catch (error) {
+    console.error('Error sending game registration confirmation:', error);
     return false;
   }
 };
@@ -111,82 +166,119 @@ export const sendGameNotification = async (type, gameData, specificUserIds = nul
  */
 export const checkAndSendGameClosingSoonNotifications = async () => {
   try {
-    const gamesRef = collection(db, 'games');
     const now = new Date();
-    
-    // Find games closing soon (within next 24 hours)
-    const closingSoonGames = await getDocs(query(
-      gamesRef,
-      where('isOpen', '==', true),
-      where('deadline', '<=', new Date(now.getTime() + 24 * 60 * 60 * 1000))
-    ));
+    const gamesRef = collection(db, 'games');
+    const gamesQuery = query(gamesRef, where('isOpen', '==', true));
+    const gamesSnapshot = await getDocs(gamesQuery);
+    const notificationPromises = [];
 
-    for (const gameDoc of closingSoonGames.docs) {
-      const gameData = gameDoc.data();
-      
-      // Calculate hours remaining
-      const deadlineDate = new Date(gameData.deadline);
-      const hoursRemaining = Math.ceil((deadlineDate - now) / (1000 * 60 * 60));
+    gamesSnapshot.forEach(gameDoc => {
+      const game = gameDoc.data();
+      const gameId = gameDoc.id;
 
-      // Send notifications
-      await sendGameNotification('gameClosingSoon', {
-        id: gameDoc.id,
-        location: gameData.location,
-        date: gameData.date,
-        hoursRemaining
-      });
+      // Skip games without a date or time
+      if (!game.date || !game.time) return;
 
-      // Optionally update game status if needed
-      if (hoursRemaining <= 0) {
-        await updateDoc(doc(db, 'games', gameDoc.id), {
-          isOpen: false,
-          status: 'closed'
+      // Parse the game date and time
+      const gameDateTime = new Date(`${game.date}T${game.time}`);
+
+      // Skip invalid dates
+      if (isNaN(gameDateTime.getTime())) return;
+
+      // Calculate hours until game
+      const hoursUntilGame = (gameDateTime - now) / (1000 * 60 * 60);
+
+      // Send notifications for games closing in 24 hours
+      if (hoursUntilGame > 23 && hoursUntilGame < 25) {
+        console.log(`Game ${gameId} is closing in about 24 hours`);
+
+        const formattedDate = format(gameDateTime, 'MMMM do, yyyy');
+        const notificationPromise = sendGameNotification('gameClosingSoon', {
+          id: gameId,
+          ...game,
+          formattedDate,
+          hoursRemaining: Math.round(hoursUntilGame)
         });
+
+        notificationPromises.push(notificationPromise);
       }
-    }
+    });
+
+    await Promise.all(notificationPromises);
+    console.log('Finished checking for games closing soon');
   } catch (error) {
-    console.error('Error checking games closing soon:', error);
+    console.error('Error checking for games closing soon:', error);
   }
 };
 
 /**
- * Send game registration confirmation to a specific user
- * @param {string} gameId - ID of the game
- * @param {string} userId - ID of the user being registered
+ * Send notifications when a game is closed
+ * @param {string} gameId - ID of the game that was closed
  */
-export const sendGameRegistrationConfirmation = async (gameId, userId) => {
+export const sendGameClosedNotifications = async (gameId) => {
   try {
-    // Fetch game details
     const gameRef = doc(db, 'games', gameId);
     const gameDoc = await getDoc(gameRef);
-    
+
     if (!gameDoc.exists()) {
-      console.error(`Game not found: ${gameId}`);
+      console.error(`Game ${gameId} not found`);
       return false;
     }
 
-    const gameData = gameDoc.data();
+    const game = gameDoc.data();
+    const playerIds = game.players || [];
 
-    // Validate game data
-    if (!gameData.location || !gameData.date || !gameData.time) {
-      console.error('Incomplete game data', gameData);
+    if (playerIds.length === 0) {
+      console.log(`No players in game ${gameId}`);
       return false;
     }
 
-    // Send confirmation to the specific user
-    return await sendGameNotification('gameConfirmation', {
+    const gameDate = new Date(`${game.date}T${game.time}`);
+    const formattedDate = format(gameDate, 'MMMM do, yyyy');
+
+    return sendGameNotification('gameClosed', {
       id: gameId,
-      location: gameData.location,
-      date: gameData.date,
-      time: gameData.time
-    }, [userId]);
+      ...game,
+      formattedDate
+    }, playerIds);
   } catch (error) {
-    console.error('Error sending game registration confirmation:', {
-      gameId, 
-      userId, 
-      errorMessage: error.message,
-      errorStack: error.stack
-    });
+    console.error('Error sending game closed notifications:', error);
     return false;
+  }
+};
+
+/**
+ * Legacy function for backward compatibility
+ * @param {string} gameId - ID of the game
+ * @param {Object} gameData - Game data
+ */
+export const sendGameCreatedNotifications = async (gameId, gameData) => {
+  console.log('Using legacy sendGameCreatedNotifications function');
+  const gameDate = new Date(gameData.date);
+  return sendGameNotification('gameCreated', {
+    id: gameId,
+    ...gameData,
+    formattedDate: format(gameDate, 'MMMM do, yyyy')
+  });
+};
+
+/**
+ * Fetch all open games from Firestore
+ * @returns {Promise<Array>} Array of open game objects
+ */
+export const fetchOpenGames = async () => {
+  try {
+    const gamesRef = collection(db, 'games');
+    const gamesQuery = query(gamesRef, where('isOpen', '==', true));
+    const gamesSnapshot = await getDocs(gamesQuery);
+    
+    return gamesSnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      title: doc.data().title || `Game at ${doc.data().location}`
+    }));
+  } catch (error) {
+    console.error('Error fetching open games:', error);
+    return [];
   }
 };

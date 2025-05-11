@@ -29,10 +29,24 @@ const NotificationSettings = () => {
 
 
   const [settings, setSettings] = useState({
-    gameCreated: true,
+    // Game notifications
+    game: true,
+    game_created: true,
+    game_updated: true,
     gameClosingSoon: true,
     gameClosed: true,
-    tournamentUpdates: true
+    
+    // Tournament notifications
+    tournament_created: true,
+    tournament_deadline: true,
+    match_result: true,
+    tournament_winner: true,
+    bracket_update: true,
+    upcoming_match: true,
+    
+    // General settings
+    general: true,
+    showDuplicates: false
   });
   const [permissionStatus, setPermissionStatus] = useState('default');
   const [loading, setLoading] = useState(true);
@@ -55,9 +69,38 @@ const NotificationSettings = () => {
           return;
         }
 
+        // First check localStorage for cached preferences
+        const localPrefs = localStorage.getItem('notificationPreferences');
+        let localSettings = null;
+        
+        if (localPrefs) {
+          try {
+            localSettings = JSON.parse(localPrefs);
+          } catch (e) {
+            console.error('Error parsing local notification preferences:', e);
+          }
+        }
+        
+        // Then check Firestore for user settings
         const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
+        let firestoreSettings = null;
+        
         if (userDoc.exists() && userDoc.data().notificationSettings) {
-          setSettings(userDoc.data().notificationSettings);
+          firestoreSettings = userDoc.data().notificationSettings;
+        }
+        
+        // Merge settings, prioritizing Firestore settings
+        if (firestoreSettings || localSettings) {
+          const mergedSettings = {
+            ...settings, // Default settings
+            ...(localSettings || {}), // Local settings if available
+            ...(firestoreSettings || {}) // Firestore settings override local
+          };
+          
+          setSettings(mergedSettings);
+          
+          // Update localStorage with the merged settings
+          localStorage.setItem('notificationPreferences', JSON.stringify(mergedSettings));
         }
       } catch (error) {
         console.error('Error fetching notification settings:', error);
@@ -120,7 +163,19 @@ const NotificationSettings = () => {
   const handleSaveSettings = async () => {
     setSaving(true);
     try {
+      // Save to Firestore
       await updateNotificationSettings(settings);
+      
+      // Also save to localStorage for faster access and to prevent duplicates
+      localStorage.setItem('notificationPreferences', JSON.stringify(settings));
+      
+      // Clear shown notifications if user enables showing duplicates
+      if (settings.showDuplicates) {
+        localStorage.removeItem('shownNotifications');
+        sessionStorage.removeItem('sessionNotifications');
+        console.log('Cleared notification history to allow duplicates');
+      }
+      
       setSnackbar({
         open: true,
         message: 'Notification settings saved successfully',
@@ -217,48 +272,165 @@ const NotificationSettings = () => {
         Choose which notifications you want to receive:
       </Typography>
 
-      <FormGroup>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.gameCreated}
-              onChange={() => handleToggle('gameCreated')}
-              disabled={permissionStatus !== 'granted'}
-            />
-          }
-          label="New games created"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.gameClosingSoon}
-              onChange={() => handleToggle('gameClosingSoon')}
-              disabled={permissionStatus !== 'granted'}
-            />
-          }
-          label="Games closing soon (24 hours before)"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.gameClosed}
-              onChange={() => handleToggle('gameClosed')}
-              disabled={permissionStatus !== 'granted'}
-            />
-          }
-          label="Game registration closed"
-        />
-        <FormControlLabel
-          control={
-            <Switch
-              checked={settings.tournamentUpdates}
-              onChange={() => handleToggle('tournamentUpdates')}
-              disabled={permissionStatus !== 'granted'}
-            />
-          }
-          label="Tournament updates"
-        />
-      </FormGroup>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ color: '#FFFFFF', mt: 2, mb: 1 }}>
+          Game Notifications
+        </Typography>
+        <Divider sx={{ mb: 2, bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+        
+        <FormGroup>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.game}
+                onChange={() => handleToggle('game')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="All game notifications"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.game_created}
+                onChange={() => handleToggle('game_created')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="New games created"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.game_updated}
+                onChange={() => handleToggle('game_updated')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Game updates"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.gameClosingSoon}
+                onChange={() => handleToggle('gameClosingSoon')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Games closing soon (24 hours before)"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.gameClosed}
+                onChange={() => handleToggle('gameClosed')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Game registration closed"
+          />
+        </FormGroup>
+      </Box>
+      
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ color: '#FFFFFF', mt: 2, mb: 1 }}>
+          Tournament Notifications
+        </Typography>
+        <Divider sx={{ mb: 2, bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+        
+        <FormGroup>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.tournament_created}
+                onChange={() => handleToggle('tournament_created')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="New tournaments created"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.tournament_deadline}
+                onChange={() => handleToggle('tournament_deadline')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Tournament registration deadlines"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.match_result}
+                onChange={() => handleToggle('match_result')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Match results"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.tournament_winner}
+                onChange={() => handleToggle('tournament_winner')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Tournament winners"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.bracket_update}
+                onChange={() => handleToggle('bracket_update')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Tournament bracket updates"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.upcoming_match}
+                onChange={() => handleToggle('upcoming_match')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Upcoming match reminders"
+          />
+        </FormGroup>
+      </Box>
+      
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h6" gutterBottom sx={{ color: '#FFFFFF', mt: 2, mb: 1 }}>
+          Advanced Settings
+        </Typography>
+        <Divider sx={{ mb: 2, bgcolor: 'rgba(255, 255, 255, 0.1)' }} />
+        
+        <FormGroup>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.general}
+                onChange={() => handleToggle('general')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="General notifications"
+          />
+          <FormControlLabel
+            control={
+              <Switch
+                checked={settings.showDuplicates}
+                onChange={() => handleToggle('showDuplicates')}
+                disabled={permissionStatus !== 'granted'}
+              />
+            }
+            label="Allow duplicate notifications"
+          />
+        </FormGroup>
+      </Box>
 
       <Box mt={3}>
         <Button

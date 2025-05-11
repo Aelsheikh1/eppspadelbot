@@ -14,6 +14,18 @@ import {
 // Track shown notifications to prevent duplicates
 const shownNotifications = new Set();
 
+// Load previously shown notifications from localStorage on startup
+try {
+  const storedNotifications = localStorage.getItem('shownNotifications');
+  if (storedNotifications) {
+    const parsedNotifications = JSON.parse(storedNotifications);
+    parsedNotifications.forEach(id => shownNotifications.add(id));
+    console.log(`Loaded ${shownNotifications.size} previously shown notifications`);
+  }
+} catch (e) {
+  console.error('Error loading shown notifications:', e);
+}
+
 /**
  * Sets up a listener for custom notifications
  * This bypasses Firebase Cloud Messaging completely
@@ -59,8 +71,17 @@ export const setupNotificationListener = () => {
     const userRole = await getUserRole();
     console.log('User role for notifications:', userRole);
     
-    // Get the last notification timestamp from localStorage
-    const lastNotificationTime = localStorage.getItem('lastNotificationTime') || '0';
+    // Get the notification enabled timestamp from localStorage
+    // If not found, create it now to only show notifications from this point forward
+    let notificationsEnabledTime = localStorage.getItem('notificationsEnabledTime');
+    if (!notificationsEnabledTime) {
+      notificationsEnabledTime = Date.now().toString();
+      localStorage.setItem('notificationsEnabledTime', notificationsEnabledTime);
+      console.log('First time enabling notifications, setting current time as baseline:', new Date(parseInt(notificationsEnabledTime)));
+    }
+    
+    // Get the last notification timestamp, defaulting to the time when notifications were enabled
+    const lastNotificationTime = localStorage.getItem('lastNotificationTime') || notificationsEnabledTime;
     console.log('Last notification time:', new Date(parseInt(lastNotificationTime)));
     
     // Query for notifications created after the last seen timestamp
@@ -124,10 +145,9 @@ export const setupNotificationListener = () => {
         
         // Update the last notification time to the most recent one
         const latestTimestamp = Math.max(
-          ...newNotifications.map(n => new Date(n.createdAt).getTime()),
-          parseInt(lastNotificationTime)
+          ...newNotifications.map(n => new Date(n.createdAt).getTime())
         );
-        localStorage.setItem('lastNotificationTime', latestTimestamp.toString());
+        localStorage.setItem('lastNotificationTime', Date.now().toString());
       }
     });
     
@@ -214,8 +234,20 @@ export const setupNotificationListener = () => {
       const notificationId = notificationData.id || '';
       const uniqueId = 'custom-notification-' + notificationId + '-' + Date.now();
       
+      // Create a more robust deduplication key that includes all relevant data
+      const dedupeKey = `${notificationId}-${notificationData.type || ''}-${notificationData.title}-${notificationData.body}`;
+      
+      // Check user notification preferences before showing
+      const userPreferences = getUserNotificationPreferences();
+      const notificationType = notificationData.type || 'general';
+      
+      // Skip if user has disabled this notification type
+      if (userPreferences && userPreferences[notificationType] === false) {
+        console.log(`User has disabled ${notificationType} notifications. Skipping:`, notificationData.title);
+        return false;
+      }
+      
       // Check if we've already shown this notification
-      const dedupeKey = `${notificationId}-${notificationData.title}-${notificationData.body}`;
       if (shownNotifications.has(dedupeKey)) {
         console.log('Skipping duplicate notification:', notificationData.title);
         return false;
@@ -225,35 +257,49 @@ export const setupNotificationListener = () => {
       shownNotifications.add(dedupeKey);
       
       // Limit the size of the set to prevent memory leaks
-      if (shownNotifications.size > 100) {
+      if (shownNotifications.size > 200) {
         // Remove the oldest entries (convert to array, slice, and convert back to set)
         const notificationsArray = Array.from(shownNotifications);
         shownNotifications.clear();
-        notificationsArray.slice(-50).forEach(item => shownNotifications.add(item));
+        notificationsArray.slice(-100).forEach(item => shownNotifications.add(item));
       }
       
-      // Also store in sessionStorage to prevent duplicates across page refreshes
+      // Store in localStorage to prevent duplicates across page refreshes and sessions
       try {
-        const shownNotificationsStr = sessionStorage.getItem('shownNotifications') || '[]';
-        const shownNotificationsArr = JSON.parse(shownNotificationsStr);
+        // Save the entire set to localStorage
+        localStorage.setItem('shownNotifications', JSON.stringify(Array.from(shownNotifications)));
         
-        // Check if this notification is in the session storage
-        if (shownNotificationsArr.includes(dedupeKey)) {
+        // Also track in sessionStorage for immediate session reference
+        const sessionNotifications = JSON.parse(sessionStorage.getItem('sessionNotifications') || '[]');
+        
+        // Check if this notification is already in the session storage
+        if (sessionNotifications.includes(dedupeKey)) {
           console.log('Skipping duplicate notification (from session):', notificationData.title);
           return false;
         }
         
         // Add to session storage
-        shownNotificationsArr.push(dedupeKey);
+        sessionNotifications.push(dedupeKey);
         
         // Limit array size
-        if (shownNotificationsArr.length > 50) {
-          shownNotificationsArr.splice(0, shownNotificationsArr.length - 50);
+        if (sessionNotifications.length > 100) {
+          sessionNotifications.splice(0, sessionNotifications.length - 100);
         }
         
-        sessionStorage.setItem('shownNotifications', JSON.stringify(shownNotificationsArr));
+        sessionStorage.setItem('sessionNotifications', JSON.stringify(sessionNotifications));
       } catch (e) {
-        console.error('Error with sessionStorage:', e);
+        console.error('Error with notification storage:', e);
+      }
+      
+      // Function to get user notification preferences
+      function getUserNotificationPreferences() {
+        try {
+          const preferencesStr = localStorage.getItem('notificationPreferences');
+          return preferencesStr ? JSON.parse(preferencesStr) : null;
+        } catch (e) {
+          console.error('Error getting notification preferences:', e);
+          return null;
+        }
       }
       
       // Create notification options
@@ -271,6 +317,22 @@ export const setupNotificationListener = () => {
           notificationId: notificationData.id || uniqueId
         }
       };
+      
+      // Add action buttons if this is a game notification
+      if (notificationData.data?.gameId) {
+        options.actions = [
+          {
+            action: 'join',
+            title: 'Join Game',
+            icon: '/logo192.png'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss',
+            icon: '/close-icon.png'
+          }
+        ];
+      }
       
       // Create and show notification
       const notification = new Notification(
@@ -291,6 +353,27 @@ export const setupNotificationListener = () => {
           window.location.href = notificationData.data.url;
         }
       };
+      
+      // Add action button handlers
+      navigator.serviceWorker.ready.then(registration => {
+        // Listen for notification actions
+        registration.addEventListener('notificationclick', event => {
+          event.notification.close();
+          
+          // Handle different actions
+          if (event.action === 'join' && notificationData.data?.gameId) {
+            // Join the game
+            console.log('Join game action clicked for game:', notificationData.data.gameId);
+            window.focus();
+            window.location.href = `/games/${notificationData.data.gameId}`;
+          } else if (event.action === 'dismiss') {
+            // Just dismiss the notification
+            console.log('Notification dismissed');
+          }
+        });
+      }).catch(error => {
+        console.error('Error setting up notification action handlers:', error);
+      });
       
       console.log('Notification displayed:', notificationData.title);
       return true;

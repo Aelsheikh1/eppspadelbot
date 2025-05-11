@@ -15,11 +15,13 @@ export const sendGameNotification = async (type, gameData, specificUserIds = nul
     let notificationDetails = {
       title: '',
       body: '',
-      type,
+      type: 'game', // Base type for all game notifications
       showPopup: true,
       data: {
         gameId: gameData.id,
-        url: `/games/${gameData.id}`
+        url: `/games/${gameData.id}`,
+        type: 'game', // This is needed for the service worker to identify game notifications
+        action: 'join' // Default action for game notifications
       }
     };
 
@@ -27,20 +29,27 @@ export const sendGameNotification = async (type, gameData, specificUserIds = nul
       case 'gameCreated':
         notificationDetails.title = 'New Game Available';
         notificationDetails.body = `A new game has been created at ${gameData.location} on ${gameData.formattedDate || gameData.date} at ${gameData.time}.`;
+        notificationDetails.type = 'game_created'; // Specific type for created games
+        notificationDetails.data.type = 'game'; // Keep the base type for service worker
         break;
       case 'gameJoined':
       case 'gameConfirmation':
         notificationDetails.title = 'Game Registration Confirmed';
         notificationDetails.body = `You are registered for the game at ${gameData.location} on ${gameData.formattedDate || gameData.date} at ${gameData.time}. See you on the court!`;
         notificationDetails.type = 'gameConfirmation';
+        notificationDetails.data.type = 'game';
         break;
       case 'gameClosed':
         notificationDetails.title = 'Game Registration Closed';
         notificationDetails.body = `Registration for the game at ${gameData.location} on ${gameData.formattedDate || gameData.date} is now closed.`;
+        notificationDetails.type = 'game_closed';
+        notificationDetails.data.type = 'game';
         break;
       case 'gameClosingSoon':
         notificationDetails.title = 'Game Closing Soon';
         notificationDetails.body = `Registration for the game at ${gameData.location} on ${gameData.formattedDate || gameData.date} closes in ${gameData.hoursRemaining} hours`;
+        notificationDetails.type = 'game_closing_soon';
+        notificationDetails.data.type = 'game';
         break;
       default:
         throw new Error(`Unknown notification type: ${type}`);
@@ -91,9 +100,11 @@ export const sendGameNotification = async (type, gameData, specificUserIds = nul
             date: gameData.date,
             time: gameData.time,
             url: `/games/${gameData.id}`,
+            type: 'game', // Ensure this is set for service worker
+            action: 'join', // Default action for game notifications
             style: {
-              background: '#2A2A2A',
-              color: '#FFFFFF',
+              background: '#2A2A2A', // Dark mode background
+              color: '#FFFFFF', // White text for better readability
               borderRadius: '8px',
               padding: '16px',
             }

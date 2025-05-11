@@ -25,9 +25,18 @@ let isNotificationInitialized = false;
 
 const initializeNotifications = async () => {
   try {
+    // Check if notifications have already been initialized in this session
     if (isNotificationInitialized) return;
+    
+    // Check if notifications have been initialized in a previous session
+    const notificationInitialized = localStorage.getItem('notificationInitialized');
+    if (notificationInitialized === 'true') {
+      console.log('🔔 Notifications already initialized in a previous session');
+      isNotificationInitialized = true;
+      return;
+    }
 
-    console.log('🔔 Initializing notifications...');
+    console.log('🔔 Initializing notifications for the first time...');
 
     // Check if notifications are supported
     if (!('Notification' in window)) {
@@ -122,8 +131,25 @@ const initializeNotifications = async () => {
       console.warn('⚠️ Service Worker not supported in this browser');
     }
 
-    // Set flag to prevent re-initialization
+    // Set flags to prevent re-initialization both in memory and localStorage
     isNotificationInitialized = true;
+    localStorage.setItem('notificationInitialized', 'true');
+    
+    // Show a welcome notification only on first initialization
+    if (Notification.permission === 'granted') {
+      // Use a timeout to ensure this doesn't block the app initialization
+      setTimeout(() => {
+        try {
+          new Notification('Notifications Enabled', {
+            body: 'You will now receive notifications for games and tournaments.',
+            icon: '/logo192.png',
+            silent: false
+          });
+        } catch (e) {
+          console.error('Error showing welcome notification:', e);
+        }
+      }, 2000);
+    }
   } catch (error) {
     console.error('❌ Error initializing notifications:', error);
     console.error(error);

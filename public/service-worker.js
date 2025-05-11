@@ -123,25 +123,148 @@ self.addEventListener('push', event => {
     const body = data.notification?.body || 'You have a new notification';
     const url = data.notification?.data?.url || '/';
     
-    event.waitUntil(
-      self.registration.showNotification(title, {
-        body: body,
-        icon: '/logo192.png', // Use local assets to avoid network issues
-        badge: '/logo192.png',
-        data: { url },
-        vibrate: [200, 100, 200],
-        requireInteraction: true,
-        actions: [
+    // Determine notification type
+    const notificationType = data.notification?.data?.type || 'default';
+    const gameId = data.notification?.data?.gameId || null;
+    const tournamentId = data.notification?.data?.tournamentId || null;
+    const matchId = data.notification?.data?.matchId || null;
+    
+    console.log('[Service Worker] Notification data:', data.notification?.data);
+    
+    // Create notification options with dark mode styling
+    const notificationOptions = {
+      body: body,
+      icon: '/logo192.png', // Use local assets to avoid network issues
+      badge: '/logo192.png',
+      data: data.notification?.data || { url },
+      vibrate: [200, 100, 200],
+      requireInteraction: true,
+      // Dark mode styling with high contrast
+      silent: false
+    };
+    
+    // Add appropriate actions based on notification type
+    switch (notificationType) {
+      case 'game':
+      case 'game_created':
+      case 'game_updated':
+        // Game notifications
+        notificationOptions.actions = [
+          {
+            action: 'join',
+            title: 'Join Game',
+            icon: '/logo192.png'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss',
+            icon: '/close-icon.png'
+          }
+        ];
+        break;
+        
+      case 'tournament_created':
+        // New tournament notifications
+        notificationOptions.actions = [
+          {
+            action: 'register',
+            title: 'Register',
+            icon: '/logo192.png'
+          },
+          {
+            action: 'view_tournament',
+            title: 'View Details'
+          }
+        ];
+        break;
+        
+      case 'tournament_deadline':
+        // Registration deadline notifications
+        notificationOptions.actions = [
+          {
+            action: 'view_tournament',
+            title: 'View Tournament'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss'
+          }
+        ];
+        break;
+        
+      case 'match_result':
+        // Match result notifications
+        notificationOptions.actions = [
+          {
+            action: 'view_match',
+            title: 'View Match'
+          },
+          {
+            action: 'view_bracket',
+            title: 'View Bracket'
+          }
+        ];
+        break;
+        
+      case 'tournament_winner':
+        // Tournament winner notifications
+        notificationOptions.icon = '/trophy-icon.png'; // Special trophy icon
+        notificationOptions.actions = [
+          {
+            action: 'view_results',
+            title: 'View Results'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss'
+          }
+        ];
+        break;
+        
+      case 'bracket_update':
+        // Bracket update notifications
+        notificationOptions.actions = [
+          {
+            action: 'view_bracket',
+            title: 'View Bracket'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss'
+          }
+        ];
+        break;
+        
+      case 'upcoming_match':
+        // Upcoming match notifications
+        notificationOptions.actions = [
+          {
+            action: 'view_match',
+            title: 'View Match'
+          },
+          {
+            action: 'dismiss',
+            title: 'Dismiss'
+          }
+        ];
+        break;
+        
+      default:
+        // Default actions for other notification types
+        notificationOptions.actions = [
           {
             action: 'open',
             title: 'View'
           },
           {
-            action: 'close',
+            action: 'dismiss',
             title: 'Dismiss'
           }
-        ]
-      })
+        ];
+    }
+    
+    event.waitUntil(
+      self.registration.showNotification(title, notificationOptions)
     );
   } catch (error) {
     console.error('[Service Worker] Error handling push event:', error);
@@ -150,10 +273,98 @@ self.addEventListener('push', event => {
 
 // Notification click handler
 self.addEventListener('notificationclick', event => {
-  console.log('[Service Worker] Notification clicked');
+  console.log('[Service Worker] Notification clicked', event.action);
   
   event.notification.close();
   
+  // Handle specific actions for different notification types
+  const notificationData = event.notification.data || {};
+  
+  // Handle action buttons
+  if (event.action) {
+    let targetUrl = '/';
+    
+    switch (event.action) {
+      case 'join':
+        // Game notifications
+        if (notificationData.gameId) {
+          targetUrl = `/games/${notificationData.gameId}`;
+          console.log('[Service Worker] Joining game:', targetUrl);
+        }
+        break;
+        
+      case 'register':
+        // Tournament registration
+        if (notificationData.tournamentId) {
+          targetUrl = `/tournaments/${notificationData.tournamentId}/register`;
+          console.log('[Service Worker] Registering for tournament:', targetUrl);
+        }
+        break;
+        
+      case 'view_tournament':
+        // View tournament details
+        if (notificationData.tournamentId) {
+          targetUrl = `/tournaments/${notificationData.tournamentId}`;
+          console.log('[Service Worker] Viewing tournament:', targetUrl);
+        }
+        break;
+        
+      case 'view_bracket':
+        // View tournament bracket
+        if (notificationData.tournamentId) {
+          targetUrl = `/tournaments/${notificationData.tournamentId}/bracket`;
+          console.log('[Service Worker] Viewing tournament bracket:', targetUrl);
+        }
+        break;
+        
+      case 'view_match':
+        // View match details
+        if (notificationData.tournamentId && notificationData.matchId) {
+          targetUrl = `/tournaments/${notificationData.tournamentId}/matches/${notificationData.matchId}`;
+          console.log('[Service Worker] Viewing match:', targetUrl);
+        }
+        break;
+        
+      case 'view_results':
+        // View tournament results
+        if (notificationData.tournamentId) {
+          targetUrl = `/tournaments/${notificationData.tournamentId}/results`;
+          console.log('[Service Worker] Viewing tournament results:', targetUrl);
+        }
+        break;
+        
+      case 'dismiss':
+      case 'close':
+        // Just dismiss the notification
+        console.log('[Service Worker] Notification dismissed');
+        return;
+        
+      default:
+        // If we have a URL in the data, use that
+        if (notificationData.url) {
+          targetUrl = notificationData.url;
+        }
+    }
+    
+    // Navigate to the target URL
+    event.waitUntil(
+      clients.matchAll({ type: 'window' }).then(windowClients => {
+        // Check if we already have a window open
+        if (windowClients.length > 0) {
+          // Focus the first window and navigate
+          windowClients[0].focus();
+          windowClients[0].navigate(targetUrl);
+          return;
+        }
+        
+        // Open a new window with the target URL
+        return clients.openWindow(targetUrl);
+      })
+    );
+    return;
+  }
+  
+  // Default behavior for regular clicks (no specific action)
   const url = event.notification.data?.url || '/';
   event.waitUntil(
     clients.matchAll({ type: 'window' }).then(windowClients => {

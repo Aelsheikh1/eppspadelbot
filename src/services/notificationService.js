@@ -197,6 +197,13 @@ export const registerDevice = async () => {
       lastActive: new Date().toISOString(),
       notificationsEnabled: true
     });
+    
+    // Set the notifications enabled timestamp if it doesn't exist yet
+    if (!localStorage.getItem('notificationsEnabledTime')) {
+      const enabledTime = Date.now().toString();
+      localStorage.setItem('notificationsEnabledTime', enabledTime);
+      console.log('[Notifications] First time enabling notifications, setting baseline time:', new Date(parseInt(enabledTime)));
+    }
 
     return deviceId;
   } catch (error) {

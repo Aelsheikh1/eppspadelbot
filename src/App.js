@@ -90,6 +90,18 @@ const createAppTheme = (mode) => createTheme({
       card: mode === 'dark' ? '#242526' : '#ffffff', // Custom background for cards
       cardHover: mode === 'dark' ? '#2d2d2e' : '#f5f5f5', // Hover state for cards
     },
+    text: {
+      primary: mode === 'dark' ? '#ffffff' : '#000000',
+      secondary: mode === 'dark' ? '#b0b0b0' : '#757575',
+      disabled: mode === 'dark' ? '#6c6c6c' : '#9e9e9e',
+    },
+    action: {
+      active: mode === 'dark' ? '#ffffff' : '#000000',
+      hover: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.04)',
+      selected: mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.08)',
+      disabled: mode === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.26)',
+      disabledBackground: mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
+    },
     success: {
       main: mode === 'dark' ? '#66bb6a' : '#4caf50',
       dark: mode === 'dark' ? '#338a3e' : '#087f23',
@@ -113,46 +125,34 @@ const createAppTheme = (mode) => createTheme({
       dark: mode === 'dark' ? '#0086c3' : '#007ac1',
       light: mode === 'dark' ? '#73e8ff' : '#67daff',
       contrastText: mode === 'dark' ? '#000000' : '#ffffff',
-    },
-    text: {
-      primary: mode === 'dark' ? '#ffffff' : '#000000',
-      secondary: mode === 'dark' ? '#b0b0b0' : '#757575',
-      disabled: mode === 'dark' ? '#6c6c6c' : '#9e9e9e',
-    },
-    divider: mode === 'dark' ? 'rgba(255, 255, 255, 0.12)' : 'rgba(0, 0, 0, 0.12)',
-  },
-  typography: {
-    fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h6: {
-      fontWeight: 600,
-    },
-    button: {
-      fontWeight: 600,
-      textTransform: 'none',
-    },
-  },
-  shape: {
-    borderRadius: 8,
+    }
   },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
-          backgroundImage: mode === 'dark' 
-            ? 'linear-gradient(to bottom right, rgba(92, 107, 192, 0.05), rgba(41, 182, 246, 0.05))'
-            : 'linear-gradient(to bottom right, rgba(63, 81, 181, 0.02), rgba(33, 150, 243, 0.02))',
+          backgroundColor: mode === 'dark' ? '#2A2A2A' : '#ffffff',
+          color: mode === 'dark' ? '#ffffff' : '#000000',
           boxShadow: mode === 'dark' 
-            ? '0 4px 20px 0 rgba(0, 0, 0, 0.5)'
-            : '0 2px 10px 0 rgba(0, 0, 0, 0.1)',
+            ? '0 4px 8px rgba(0, 0, 0, 0.5)' 
+            : '0 2px 4px rgba(0, 0, 0, 0.1)',
           transition: 'all 0.3s ease-in-out',
           '&:hover': {
-            transform: 'translateY(-4px)',
+            transform: 'translateY(-2px)',
             boxShadow: mode === 'dark' 
-              ? '0 8px 25px 0 rgba(0, 0, 0, 0.6)'
-              : '0 4px 15px 0 rgba(0, 0, 0, 0.2)',
-          },
-        },
-      },
+              ? '0 6px 12px rgba(0, 0, 0, 0.6)' 
+              : '0 4px 8px rgba(0, 0, 0, 0.2)',
+          }
+        }
+      }
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundColor: mode === 'dark' ? '#2A2A2A' : '#ffffff',
+          color: mode === 'dark' ? '#ffffff' : '#000000',
+        }
+      }
     },
     MuiButton: {
       styleOverrides: {
@@ -160,126 +160,98 @@ const createAppTheme = (mode) => createTheme({
           borderRadius: 8,
           textTransform: 'none',
           fontWeight: 600,
-          boxShadow: mode === 'dark' 
-            ? '0 2px 8px 0 rgba(0, 0, 0, 0.3)'
-            : '0 1px 5px 0 rgba(0, 0, 0, 0.1)',
           transition: 'all 0.2s ease-in-out',
-          '&:hover': {
-            transform: 'translateY(-2px)',
-            boxShadow: mode === 'dark' 
-              ? '0 4px 12px 0 rgba(0, 0, 0, 0.4)'
-              : '0 2px 8px 0 rgba(0, 0, 0, 0.2)',
-          },
         },
         contained: {
-          // Enhance contrast for contained buttons in dark mode
+          boxShadow: mode === 'dark' 
+            ? '0 2px 4px rgba(0, 0, 0, 0.3)' 
+            : '0 1px 3px rgba(0, 0, 0, 0.2)',
+          '&:hover': {
+            boxShadow: mode === 'dark' 
+              ? '0 4px 8px rgba(0, 0, 0, 0.4)' 
+              : '0 2px 6px rgba(0, 0, 0, 0.3)',
+          },
           ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #7986cb 30%, #49599a 90%)',
-            color: '#ffffff',
-            fontWeight: 700,
-            letterSpacing: '0.5px',
+            backgroundColor: '#5c6bc0', // Higher contrast for contained buttons in dark mode
             '&:hover': {
-              background: 'linear-gradient(135deg, #aab6fe 30%, #7986cb 90%)',
-              boxShadow: '0 4px 12px 0 rgba(121, 134, 203, 0.6)',
-            },
-          }),
+              backgroundColor: '#3f51b5',
+            }
+          })
         },
-        outlined: {
-          // Enhance contrast for outlined buttons in dark mode
-          ...(mode === 'dark' && {
-            borderWidth: '2px',
-            fontWeight: 700,
-            '&:hover': {
-              borderWidth: '2px',
-              backgroundColor: 'rgba(255, 255, 255, 0.1)',
-            },
-          }),
+        containedPrimary: {
+          background: mode === 'dark' 
+            ? 'linear-gradient(135deg, #7986cb 30%, #49599a 90%)' 
+            : 'linear-gradient(135deg, #3f51b5 30%, #303f9f 90%)',
+          '&:hover': {
+            background: mode === 'dark' 
+              ? 'linear-gradient(135deg, #5c6bc0 30%, #3949ab 90%)' 
+              : 'linear-gradient(135deg, #303f9f 30%, #1a237e 90%)',
+          }
         },
         containedSecondary: {
-          // Enhance contrast for secondary contained buttons in dark mode
-          ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #64b5f6 30%, #2286c3 90%)',
-            color: '#ffffff',
-            '&:hover': {
-              background: 'linear-gradient(135deg, #9be7ff 30%, #64b5f6 90%)',
-              boxShadow: '0 4px 12px 0 rgba(100, 181, 246, 0.6)',
-            },
-          }),
+          background: mode === 'dark' 
+            ? 'linear-gradient(135deg, #64b5f6 30%, #2286c3 90%)' 
+            : 'linear-gradient(135deg, #2196f3 30%, #0069c0 90%)',
+          '&:hover': {
+            background: mode === 'dark' 
+              ? 'linear-gradient(135deg, #42a5f5 30%, #1976d2 90%)' 
+              : 'linear-gradient(135deg, #1976d2 30%, #0d47a1 90%)',
+          }
         },
-        outlinedSecondary: {
-          // Enhance contrast for secondary outlined buttons in dark mode
-          ...(mode === 'dark' && {
-            borderColor: '#64b5f6',
-            color: '#64b5f6',
-            borderWidth: '2px',
-            '&:hover': {
-              borderColor: '#9be7ff',
-              color: '#9be7ff',
-              borderWidth: '2px',
-              backgroundColor: 'rgba(100, 181, 246, 0.1)',
-            },
-          }),
+        outlined: {
+          borderWidth: 2,
+          '&:hover': {
+            borderWidth: 2,
+          }
         },
-      },
+        text: {
+          '&:hover': {
+            backgroundColor: mode === 'dark' 
+              ? 'rgba(92, 107, 192, 0.05)' 
+              : 'rgba(63, 81, 181, 0.05)',
+          }
+        }
+      }
     },
-    MuiChip: {
+    MuiAppBar: {
       styleOverrides: {
         root: {
-          borderRadius: 8,
-          fontWeight: 600,
-          ...(mode === 'dark' && {
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.3)',
-          }),
-        },
-        colorPrimary: {
-          ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #7986cb 30%, #49599a 90%)',
-            color: '#ffffff',
-            border: '1px solid rgba(121, 134, 203, 0.5)',
-          }),
-        },
-        colorSecondary: {
-          ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #64b5f6 30%, #2286c3 90%)',
-            color: '#ffffff',
-            border: '1px solid rgba(100, 181, 246, 0.5)',
-          }),
-        },
-        colorSuccess: {
-          ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #66bb6a 30%, #338a3e 90%)',
-            color: '#ffffff',
-            border: '1px solid rgba(102, 187, 106, 0.5)',
-          }),
-        },
-        colorError: {
-          ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #f44336 30%, #ba000d 90%)',
-            color: '#ffffff',
-            border: '1px solid rgba(244, 67, 54, 0.5)',
-          }),
-        },
-        colorWarning: {
-          ...(mode === 'dark' && {
-            background: 'linear-gradient(135deg, #ffa726 30%, #c77800 90%)',
-            color: '#000000',
-            border: '1px solid rgba(255, 167, 38, 0.5)',
-            fontWeight: 700,
-          }),
-        },
-      },
+          boxShadow: mode === 'dark' 
+            ? '0 4px 8px rgba(0, 0, 0, 0.3)' 
+            : '0 2px 4px rgba(0, 0, 0, 0.1)',
+          backgroundColor: mode === 'dark' ? '#2A2A2A' : '#3f51b5',
+        }
+      }
     },
-  },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: mode === 'dark' ? '#2A2A2A' : '#ffffff',
+          color: mode === 'dark' ? '#ffffff' : '#000000',
+        }
+      }
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: mode === 'dark' ? '#2A2A2A' : '#ffffff',
+          color: mode === 'dark' ? '#ffffff' : '#000000',
+          boxShadow: mode === 'dark' 
+            ? '0 8px 16px rgba(0, 0, 0, 0.5)' 
+            : '0 4px 12px rgba(0, 0, 0, 0.3)',
+        }
+      }
+    }
+  }
 });
 
 // NavbarWrapper Component
 const NavbarWrapper = () => {
-  const { currentUser, loading } = useAuth();
+  // Get theme context with fallback to dark mode if context is not available
+  const themeContext = useThemeMode() || { themeMode: 'dark', toggleTheme: () => {} };
+  const { themeMode, toggleTheme } = themeContext;
   
-  if (loading) return null;
-  if (!currentUser) return null;
-  
-  return <Navbar />;
+  return <Navbar mode={themeMode} toggleTheme={toggleTheme} />;
 };
 
 function AppContent() {
@@ -296,34 +268,35 @@ function AppContent() {
           // Register FCM token using the robust implementation
           const token = await requestFcmToken();
           
-          if (result) {
+          if (token) {
             console.log('[Notifications] App notifications initialized successfully');
             
             // Also register FCM token for web notifications (backward compatibility)
-            const token = await registerFCMToken(currentUser.uid);
-            if (token) {
+            const webToken = await registerFCMToken(currentUser.uid);
+            if (webToken) {
               console.log('[Notifications] FCM token registered successfully');
             } else {
               console.warn('[Notifications] Failed to register FCM token');
             }
           }
         } catch (error) {
-        console.error('[Notifications] Error initializing notifications:', error);
-      }
-    };
-    
-    // Run immediately
-    initNotifications();
-    
-    // Also set up a periodic refresh of the token (every 24 hours)
-    const tokenRefreshInterval = setInterval(() => {
-      console.log('[Notifications] Refreshing FCM token...');
+          console.error('[Notifications] Error initializing notifications:', error);
+        }
+      };
+      
+      // Run immediately
       initNotifications();
-    }, 24 * 60 * 60 * 1000); // 24 hours
-    
-    return () => {
-      clearInterval(tokenRefreshInterval);
-    };
+      
+      // Also set up a periodic refresh of the token (every 24 hours)
+      const tokenRefreshInterval = setInterval(() => {
+        console.log('[Notifications] Refreshing FCM token...');
+        initNotifications();
+      }, 24 * 60 * 60 * 1000); // 24 hours
+      
+      return () => {
+        clearInterval(tokenRefreshInterval);
+      };
+    }
   }, [currentUser]);
 
   const triggerTestNotification = () => {

@@ -1,12 +1,90 @@
-import React from 'react';
+import React, { createContext, useContext } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
+import MobileApp from './MobileApp';
 import reportWebVitals from './reportWebVitals';
-import { getMessaging } from 'firebase/messaging';
 import { initializeApp } from 'firebase/app';
-import { requestFcmToken, setupTokenRefresh } from './services/firebase';
-import { auth, db } from './services/firebase';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+
+// Create Theme Context
+export const ThemeContext = createContext();
+export const useThemeMode = () => useContext(ThemeContext);
+
+// Detect if we're on a mobile device
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+// Create theme based on mode - using dark mode with high contrast
+const createAppTheme = (mode) => createTheme({
+  palette: {
+    mode,
+    primary: {
+      main: '#7986cb',
+      light: '#aab6fe',
+      dark: '#49599a',
+      contrastText: '#ffffff',
+    },
+    secondary: {
+      main: '#64b5f6',
+      light: '#9be7ff',
+      dark: '#2286c3',
+      contrastText: '#ffffff',
+    },
+    background: {
+      default: '#121212',
+      paper: '#2A2A2A', // Darker background as per user preference
+      card: '#2A2A2A', // Custom background for cards
+      cardHover: '#3A3A3A', // Hover state for cards
+    },
+    text: {
+      primary: '#FFFFFF', // White text for better readability
+      secondary: '#FFFFFF', // White text for better readability
+    },
+    success: {
+      main: '#66bb6a',
+      dark: '#338a3e',
+      light: '#99d066',
+      contrastText: '#000000',
+    },
+    error: {
+      main: '#f44336',
+      dark: '#ba000d',
+      light: '#ff7961',
+      contrastText: '#ffffff',
+    },
+    warning: {
+      main: '#ffa726',
+      dark: '#c77800',
+      light: '#ffd95b',
+      contrastText: '#000000',
+    },
+    info: {
+      main: '#29b6f6',
+      dark: '#0086c3',
+      light: '#73e8ff',
+      contrastText: '#000000',
+    }
+  },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2A2A2A', // Darker background for cards
+          color: '#FFFFFF', // White text for better readability
+        }
+      }
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#2A2A2A', // Darker background for papers
+          color: '#FFFFFF', // White text for better readability
+        }
+      }
+    }
+  }
+});
 
 // Initialize Firebase app
 const firebaseConfig = {
@@ -24,6 +102,12 @@ const app = initializeApp(firebaseConfig);
 let isNotificationInitialized = false;
 
 const initializeNotifications = async () => {
+  // Skip notification initialization on mobile devices
+  if (isMobileDevice) {
+    console.log('📱 Mobile device detected, skipping notification initialization');
+    return;
+  }
+  
   try {
     // Check if notifications have already been initialized in this session
     if (isNotificationInitialized) return;
@@ -156,15 +240,63 @@ const initializeNotifications = async () => {
   }
 };
 
-// Initialize notifications
+// Initialize notifications (only on desktop)
 initializeNotifications();
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+
+// Get stored theme preference or default to 'dark'
+const savedTheme = localStorage.getItem('themeMode');
+const defaultTheme = savedTheme || 'dark';
+
+// Create theme based on current mode
+const theme = createAppTheme(defaultTheme);
+
+// Wrapper component to handle theme state
+const AppWithTheme = ({ children }) => {
+  // Use React hooks inside a component
+  const [themeMode, setThemeMode] = React.useState(defaultTheme);
+  
+  // Toggle theme function
+  const toggleTheme = () => {
+    const newTheme = themeMode === 'dark' ? 'light' : 'dark';
+    setThemeMode(newTheme);
+    localStorage.setItem('themeMode', newTheme);
+  };
+  
+  // Create theme based on current mode
+  const currentTheme = createAppTheme(themeMode);
+  
+  return (
+    <ThemeContext.Provider value={{ themeMode, toggleTheme }}>
+      <ThemeProvider theme={currentTheme}>
+        <CssBaseline />
+        {children}
+      </ThemeProvider>
+    </ThemeContext.Provider>
+  );
+};
+
+// Render the appropriate app based on device type
+if (isMobileDevice) {
+  console.log('📱 Rendering mobile-optimized app');
+  root.render(
+    <React.StrictMode>
+      <AppWithTheme>
+        <MobileApp />
+      </AppWithTheme>
+    </React.StrictMode>
+  );
+} else {
+  console.log('🖥️ Rendering desktop app');
+  root.render(
+    <React.StrictMode>
+      <AppWithTheme>
+        <App />
+      </AppWithTheme>
+    </React.StrictMode>
+  );
+}
 
 // Report web vitals
 reportWebVitals();

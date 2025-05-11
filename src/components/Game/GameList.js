@@ -1002,21 +1002,29 @@ export default function GameList() {
                         width: { xs: '100%', sm: 'auto' },
                         background: (theme) => isUserInGame(game) 
                           ? 'transparent' 
-                          : `linear-gradient(135deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
+                          : theme.palette.mode === 'dark' 
+                            ? `linear-gradient(135deg, #3949ab 30%, #303f9f 90%)` 
+                            : `linear-gradient(135deg, ${theme.palette.primary.main} 30%, ${theme.palette.primary.dark} 90%)`,
                         color: (theme) => isUserInGame(game) 
-                          ? (theme.palette.mode === 'dark' ? '#7986cb' : theme.palette.primary.main)
-                          : '#ffffff',
+                          ? (theme.palette.mode === 'dark' ? '#FFFFFF' : theme.palette.primary.main)
+                          : '#FFFFFF',
                         borderWidth: (theme) => theme.palette.mode === 'dark' && isUserInGame(game) ? '2px' : '1px',
                         fontWeight: (theme) => theme.palette.mode === 'dark' ? 700 : 600,
                         letterSpacing: (theme) => theme.palette.mode === 'dark' ? '0.5px' : 'inherit',
                         '&:hover': {
                           background: (theme) => isUserInGame(game) 
-                            ? (theme.palette.mode === 'dark' ? 'rgba(121, 134, 203, 0.15)' : 'rgba(92, 107, 192, 0.12)') 
-                            : `linear-gradient(135deg, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 90%)`,
+                            ? (theme.palette.mode === 'dark' ? 'rgba(255, 255, 255, 0.15)' : 'rgba(92, 107, 192, 0.12)') 
+                            : theme.palette.mode === 'dark'
+                              ? `linear-gradient(135deg, #5c6bc0 30%, #3f51b5 90%)`
+                              : `linear-gradient(135deg, ${theme.palette.primary.light} 30%, ${theme.palette.primary.main} 90%)`,
                           transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 12px 0 rgba(121, 134, 203, 0.5)'
+                          boxShadow: (theme) => theme.palette.mode === 'dark' 
+                            ? '0 4px 12px 0 rgba(63, 81, 181, 0.7)'
+                            : '0 4px 12px 0 rgba(121, 134, 203, 0.5)'
                         },
-                        boxShadow: '0 2px 8px 0 rgba(121, 134, 203, 0.4)'
+                        boxShadow: (theme) => theme.palette.mode === 'dark' 
+                          ? '0 2px 8px 0 rgba(63, 81, 181, 0.6)'
+                          : '0 2px 8px 0 rgba(121, 134, 203, 0.4)'
                       }}
                     >
                       {isUserInGame(game) ? 'Leave Game' : (game.players?.length >= game.maxPlayers ? 'Full (Join Disabled)' : 'Join Game')}

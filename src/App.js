@@ -16,6 +16,7 @@ import NotificationSettings from './components/Notifications/NotificationSetting
 import FcmTester from './components/FcmTester';
 import CustomNotificationSender from './components/CustomNotificationSender';
 import NotificationTestPage from './components/NotificationTestPage';
+import MobileNotificationTest from './components/MobileNotificationTest';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -368,6 +369,7 @@ function AppContent() {
         <Route path="/fcm-test" element={<ProtectedRoute><FcmTester /></ProtectedRoute>} />
         <Route path="/send-notification" element={<ProtectedRoute><CustomNotificationSender /></ProtectedRoute>} />
         <Route path="/notification-test" element={<ProtectedRoute><NotificationTestPage /></ProtectedRoute>} />
+        <Route path="/mobile-notifications" element={<MobileNotificationTest />} />
         {/* Admin Routes */}
         <Route path="/admin/*" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
       </Routes>

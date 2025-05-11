@@ -102,6 +102,19 @@ self.addEventListener('fetch', event => {
 self.addEventListener('push', event => {
   console.log('[Service Worker] Push Received');
   
+  // Log platform information for debugging
+  const userAgent = self.navigator ? self.navigator.userAgent : 'Unknown';
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+  const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+  const isAndroid = /Android/.test(userAgent);
+  
+  console.log('[Service Worker] Platform:', {
+    userAgent,
+    isMobile,
+    isIOS,
+    isAndroid
+  });
+  
   try {
     // Safely parse the data
     let data;
@@ -126,6 +139,12 @@ self.addEventListener('push', event => {
     // Determine notification type
     const notificationType = data.notification?.data?.type || 'default';
     const gameId = data.notification?.data?.gameId || null;
+    
+    // Check if this is a mobile platform
+    const userAgent = self.navigator ? self.navigator.userAgent : 'Unknown';
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent);
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+    const isAndroid = /Android/.test(userAgent);
     const tournamentId = data.notification?.data?.tournamentId || null;
     const matchId = data.notification?.data?.matchId || null;
     
@@ -133,14 +152,23 @@ self.addEventListener('push', event => {
     
     // Create notification options with dark mode styling
     const notificationOptions = {
-      body: body,
-      icon: '/logo192.png', // Use local assets to avoid network issues
+      body,
+      icon: '/logo192.png',
       badge: '/logo192.png',
-      data: data.notification?.data || { url },
+      data: {
+        ...data.notification?.data || {},
+        url,
+        isMobile,
+        platform: isIOS ? 'iOS' : isAndroid ? 'Android' : isMobile ? 'Other mobile' : 'Desktop'
+      },
       vibrate: [200, 100, 200],
       requireInteraction: true,
       // Dark mode styling with high contrast
-      silent: false
+      silent: false,
+      // Optimize for mobile platforms
+      tag: `${notificationType}-${Date.now()}`, // Unique tag to prevent notification stacking on mobile
+      renotify: true, // Allow notifications with the same tag to notify users again
+      timestamp: Date.now() // Add timestamp for better sorting on mobile
     };
     
     // Add appropriate actions based on notification type
@@ -274,11 +302,16 @@ self.addEventListener('push', event => {
 // Notification click handler
 self.addEventListener('notificationclick', event => {
   console.log('[Service Worker] Notification clicked', event.action);
+  console.log('[Service Worker] Notification data:', event.notification.data);
   
   event.notification.close();
   
   // Handle specific actions for different notification types
   const notificationData = event.notification.data || {};
+  const isMobile = notificationData.isMobile || false;
+  const platform = notificationData.platform || 'Unknown';
+  
+  console.log(`[Service Worker] Handling click on ${platform} platform`);
   
   // Handle action buttons
   if (event.action) {

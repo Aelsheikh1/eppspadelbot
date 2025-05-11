@@ -29,7 +29,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import EditProfile from '../Profile/EditProfile';
 import { signOut } from '../../services/firebase';
 import NotificationBell from '../NotificationBell';
-import { useThemeMode } from '../../App';
+import { useThemeMode } from '../../index';
 import { Brightness4 as DarkModeIcon, Brightness7 as LightModeIcon } from '@mui/icons-material';
 
 export default function Navbar() {
@@ -37,7 +37,11 @@ export default function Navbar() {
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [editProfileOpen, setEditProfileOpen] = useState(false);
   const { currentUser, isAdmin } = useAuth();
-  const { themeMode, toggleTheme } = useThemeMode();
+  
+  // Get theme context with fallback to dark mode if context is not available
+  const themeContext = useThemeMode() || { themeMode: 'dark', toggleTheme: () => {} };
+  const { themeMode, toggleTheme } = themeContext;
+  
   const navigate = useNavigate();
 
   const handleOpenNavMenu = (event) => {

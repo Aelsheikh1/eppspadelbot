@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Access</title>
+  <style>
+    body {
+      background-color: #2A2A2A;
+      color: #FFFFFF;
+      font-family: Arial, sans-serif;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 {
+      margin-bottom: 30px;
+    }
+    .button {
+      display: block;
+      background-color: #7986cb;
+      color: white;
+      padding: 15px 20px;
+      margin: 15px auto;
+      border-radius: 5px;
+      text-decoration: none;
+      max-width: 300px;
+      font-weight: bold;
+    }
+    .note {
+      margin-top: 30px;
+      font-size: 0.9em;
+      opacity: 0.8;
+    }
+  </style>
+</head>
+<body>
+  <h1>PadelBolt Mobile Access</h1>
+  
+  <p>Click on one of the following links to access the app:</p>
+  
+  <a href="http://192.168.100.11:3000" class="button">Access via Wi-Fi IP</a>
+  <a href="http://192.168.137.1:3000" class="button">Access via VMware IP</a>
+  <a href="http://localhost:3000" class="button">Access via Localhost</a>
+  
+  <div class="note">
+    <p>If none of these links work, make sure:</p>
+    <ul style="text-align: left; display: inline-block;">
+      <li>Your mobile device is on the same network as your computer</li>
+      <li>Your computer's firewall allows connections on port 3000</li>
+      <li>The React development server is running</li>
+    </ul>
+  </div>
+
+  <script>
+    // Attempt to detect the best URL automatically
+    const checkUrl = async (url) => {
+      try {
+        const response = await fetch(url, { 
+          mode: 'no-cors',
+          method: 'HEAD',
+          timeout: 2000
+        });
+        return true;
+      } catch (e) {
+        return false;
+      }
+    };
+
+    const tryUrls = async () => {
+      const urls = [
+        'http://192.168.100.11:3000',
+        'http://192.168.137.1:3000',
+        'http://localhost:3000'
+      ];
+      
+      for (const url of urls) {
+        const isAvailable = await checkUrl(url);
+        if (isAvailable) {
+          console.log(`URL ${url} is available, redirecting...`);
+          window.location.href = url;
+          return;
+        }
+      }
+      
+      console.log('No URLs are available');
+    };
+    
+    // Try to automatically redirect
+    tryUrls();
+  </script>
+</body>
+</html>

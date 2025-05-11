@@ -28,7 +28,35 @@ import {
   orderBy,
   addDoc
 } from 'firebase/firestore';
-import { getMessaging, getToken, onMessage, sendMulticast } from 'firebase/messaging';
+
+// Detect if we're on a mobile device
+const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+// Function to check if messaging is supported
+const isMessagingSupported = () => {
+  return (
+    typeof window !== 'undefined' && 
+    'serviceWorker' in navigator && 
+    typeof getMessaging === 'function' &&
+    typeof getToken === 'function'
+  );
+};
+
+// Check if messaging is supported before importing
+let getMessaging, getToken, onMessage, sendMulticast;
+
+// Only try to import messaging if not on a mobile device
+if (!isMobileDevice && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+  try {
+    const firebaseMessaging = require('firebase/messaging');
+    getMessaging = firebaseMessaging.getMessaging;
+    getToken = firebaseMessaging.getToken;
+    onMessage = firebaseMessaging.onMessage;
+    sendMulticast = firebaseMessaging.sendMulticast;
+  } catch (error) {
+    console.warn('Firebase messaging not supported in this browser:', error);
+  }
+}
 
 const firebaseConfig = {
   apiKey: "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
@@ -43,7 +71,29 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-export const messaging = getMessaging(app);
+
+// Only initialize messaging if it's supported
+export let messaging = null;
+export let messagingSupported = false;
+
+// Skip messaging initialization on mobile devices
+if (!isMobileDevice) {
+  try {
+    // Only try to initialize if the functions are available
+    if (typeof getMessaging === 'function' && app) {
+      messaging = getMessaging(app);
+      messagingSupported = true;
+      console.log('🔔 Firebase messaging initialized successfully');
+    } else {
+      console.log('📱 Firebase messaging not available - skipping initialization');
+    }
+  } catch (error) {
+    console.log('📱 Firebase messaging initialization error:', error.message);
+    messagingSupported = false;
+  }
+} else {
+  console.log('📱 Firebase messaging not initialized on mobile device');
+}
 
 // Configure Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
@@ -791,9 +841,12 @@ export const unregisterServiceWorker = async () => {
 };
 
 // Foreground FCM message handler: show notification using Notification API
-onMessage(messaging, (payload) => {
-  console.log('[FCM] Foreground message received:', payload);
-  if (payload.notification && payload.notification.title) {
+// Only set up if messaging is available
+if (messaging && typeof onMessage === 'function') {
+  try {
+    onMessage(messaging, (payload) => {
+      console.log('[FCM] Foreground message received:', payload);
+      if (payload.notification && payload.notification.title) {
     // Use a simpler notification approach with dark mode styling
     const notification = new Notification(payload.notification.title, {
       body: payload.notification.body || '',
@@ -813,16 +866,25 @@ onMessage(messaging, (payload) => {
       }
       notification.close();
     };
+      }
+    });
+  } catch (error) {
+    console.warn('[FCM] Error setting up onMessage handler:', error);
   }
-});
+}
 
 // Handle token refresh
-export const setupTokenRefresh = () => {
+export const setupTokenRefresh = async () => {
   try {
-    // Check if messaging is supported
-    if (!messaging) {
-      console.warn('[FCM] Messaging not initialized');
-      return;
+    // Skip if messaging is not supported
+    if (!messaging || !getToken) {
+      console.warn('[FCM] Messaging not supported in this browser/device');
+      return null;
+    }
+    
+    if (!('serviceWorker' in navigator)) {
+      console.warn('[FCM] Service workers not supported in this browser');
+      return null;
     }
     
     // Set up a timer to periodically check and refresh the token
@@ -900,9 +962,15 @@ export const setupTokenRefresh = () => {
 // Robust FCM token registration that ensures tokens are properly stored in both user document and tokens collection
 export const requestFcmToken = async () => {
   try {
-    // Check if notifications are supported
-    if (!('Notification' in window)) {
-      console.warn('[FCM] Notifications not supported in this browser');
+    // Skip if messaging is not supported
+    if (!messaging || !getToken) {
+      console.warn('[FCM] Messaging not supported in this browser/device');
+      return null;
+    }
+    
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      console.warn('[FCM] No authenticated user for token registration');
       return null;
     }
 
@@ -916,12 +984,7 @@ export const requestFcmToken = async () => {
       }
     }
 
-    // Get current user
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      console.warn('[FCM] No authenticated user for token registration');
-      return null;
-    }
+    // User is already authenticated at this point
 
     // Wait for service worker to be ready
     if ('serviceWorker' in navigator) {
@@ -1054,6 +1117,12 @@ export const requestFcmToken = async () => {
 // Utility to force FCM token registration for the current user
 export const forceRegisterFcmToken = async () => {
   try {
+    // Skip if messaging is not supported
+    if (!messaging || !getToken) {
+      console.warn('[FCM] Messaging not supported in this browser/device');
+      return null;
+    }
+    
     const currentUser = auth.currentUser;
     if (!currentUser) {
       console.warn('[FCM] No authenticated user for token registration');

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PadelBolt</string>
+    <string name="title_activity_main">PadelBolt</string>
+    <string name="package_name">com.padelbolt.app</string>
+    <string name="custom_url_scheme">com.padelbolt.app</string>
+</resources>

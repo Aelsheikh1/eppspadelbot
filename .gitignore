@@ -26,6 +26,9 @@ yarn-error.log*
 # service account
 src/service-account.json
 src/service-account-template.json
+functions/service-account.json
+functions/service-account-template.json
+*.service-account.json
 
 # backup and temporary files
 *.bak

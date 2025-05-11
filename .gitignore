@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/functions/node_modules
 /.pnp
 .pnp.js
 
@@ -25,3 +26,9 @@ yarn-error.log*
 # service account
 src/service-account.json
 src/service-account-template.json
+
+# backup and temporary files
+*.bak
+*.new
+*.tmp
+*~

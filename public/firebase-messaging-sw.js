@@ -18,6 +18,32 @@ const messaging = firebase.messaging();
 
 // Handle background messages
 messaging.onBackgroundMessage(function(payload) {
+  // Only show notification if not already shown
+  const data = payload.data || {};
+  let actions = [];
+  let urlToOpen = '/';
+  if (data.gameId) {
+    actions.push({ action: 'join', title: 'Join Game' });
+    urlToOpen = `/games/${data.gameId}`;
+  } else if (data.tournamentId || data.messageType === 'tournament_update') {
+    actions.push({ action: 'view', title: 'View Message' });
+    urlToOpen = `/tournaments/${data.tournamentId || ''}`;
+  }
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/web-app-manifest-512x512.png',
+    badge: '/web-app-manifest-192x192.png',
+    data: { ...data, url: urlToOpen },
+    actions: actions,
+    tag: data.notificationId || 'default-notification',
+    requireInteraction: true
+  };
+  // Close any previous notifications with the same tag
+  self.registration.getNotifications({ tag: notificationOptions.tag }).then(notifications => {
+    notifications.forEach(notification => notification.close());
+    self.registration.showNotification(payload.notification.title, notificationOptions);
+  });
+});
   console.log('[firebase-messaging-sw.js] Received background message:', payload);
   const data = payload.data || {};
   let actions = [];

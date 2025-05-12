@@ -236,7 +236,7 @@ export const registerFCMToken = async () => {
 };
 
 // Display a notification locally (for testing)
-export const showLocalNotification = (title, body, data = {}) => {
+export const // showLocalNotification is now handled only in the service worker to avoid duplicate notifications = (title, body, data = {}) => {
   try {
     if (!('Notification' in window)) {
       console.warn('Notifications not supported');

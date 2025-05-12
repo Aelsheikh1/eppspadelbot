@@ -21,6 +21,8 @@ import { useAuth } from '../../contexts/AuthContext';
 
 
 
+import React, { useState, useEffect } from 'react';
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const { currentUser } = useAuth();
@@ -55,21 +57,41 @@ export default function LandingPage() {
 
   const theme = useTheme();
 
+  // Add to Home Screen prompt logic
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showA2HS, setShowA2HS] = useState(false);
+
+  useEffect(() => {
+    const handler = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowA2HS(true);
+    };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleAddToHome = () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        setDeferredPrompt(null);
+        setShowA2HS(false);
+      });
+    }
+  };
+
   return (
     <Fade in={!isExiting} timeout={600}>
       <Box
         sx={{
-          minHeight: '100vh',
           display: 'flex',
+          flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(145deg, #f5f5f5 0%, #e8f5fe 100%)',
-          py: { xs: 4, sm: 6, md: 8 },
-          position: 'relative',
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            top: 0,
+          minHeight: '100vh',
+          background: theme.palette.background.default,
+          px: 2
             left: 0,
             right: 0,
             bottom: 0,

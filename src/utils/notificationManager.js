@@ -24,59 +24,58 @@ const shownNotifications = new Set();
  * @returns {Promise<boolean>} - Whether the notification was shown
  */
 const showBrowserNotification = async (options) => {
+  console.log('[NotificationManager] showBrowserNotification called:', options);
   try {
-    console.log('Showing browser notification:', options);
-    
     // Check if browser supports notifications
     if (!('Notification' in window)) {
-      console.warn('This browser does not support desktop notifications');
+      console.error('[NotificationManager] Browser does not support notifications.');
       return false;
     }
-    
     // Create a unique ID for deduplication
     const dedupeKey = `${options.title}-${options.body}`;
     if (shownNotifications.has(dedupeKey)) {
-      console.log('Skipping duplicate browser notification:', options.title);
+      console.log('[NotificationManager] Notification already shown, skipping:', dedupeKey);
       return false;
     }
-    
     // Add to shown notifications set
     shownNotifications.add(dedupeKey);
-    
     // Request permission if not granted
     if (Notification.permission !== 'granted') {
       const permission = await Notification.requestPermission();
+      console.log('[NotificationManager] Notification permission status:', permission);
       if (permission !== 'granted') {
-        console.warn('Notification permission denied');
+        console.warn('[NotificationManager] Notification permission denied');
         return false;
       }
     }
-    
     // Create notification with dark theme styling
-    const notification = new Notification(options.title, {
+    const notificationOptions = {
       body: options.body,
       icon: '/logo192.png',
       badge: '/logo192.png',
       requireInteraction: true,
       vibrate: [200, 100, 200],
-      data: options.data || {}
-    });
-    
+      data: options.data || {},
+      tag: options.tag || options.title,
+      renotify: true
+    };
+    console.log('[NotificationManager] Creating new Notification with options:', notificationOptions);
+    const notification = new Notification(options.title, notificationOptions);
+    console.log('[NotificationManager] Notification created:', notification);
     // Add click handler
-    notification.onclick = () => {
+    notification.onclick = (event) => {
+      console.log('[NotificationManager] Notification clicked:', event);
       notification.close();
       window.focus();
-      
       // Navigate to URL if provided
       if (options.data?.url) {
         window.location.href = options.data.url;
       }
     };
-    
-    console.log('Browser notification shown:', options.title);
+    console.log('[NotificationManager] Browser notification shown:', options.title);
     return true;
   } catch (error) {
-    console.error('Error showing browser notification:', error);
+    console.error('[NotificationManager] Error showing browser notification:', error);
     return false;
   }
 };

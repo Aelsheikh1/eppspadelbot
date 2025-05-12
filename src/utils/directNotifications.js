@@ -9,31 +9,31 @@
  * @returns {boolean} - Whether the notification was shown
  */
 export const showDirectNotification = (options) => {
+  console.log('[DirectNotifications] Attempting to show direct notification:', options?.title || options);
   try {
-    console.log('Showing direct notification:', options);
-    
     // Check if browser supports notifications
     if (!('Notification' in window)) {
-      console.warn('This browser does not support desktop notifications');
+      console.error('[DirectNotifications] This browser does not support desktop notification');
       return false;
     }
-    
-    // Request permission if not granted
-    if (Notification.permission !== 'granted') {
-      Notification.requestPermission().then(permission => {
+    // Permission already granted
+    if (Notification.permission === 'granted') {
+      console.log('[DirectNotifications] Permission granted. Creating notification.');
+      return createAndShowNotification(options);
+    } else if (Notification.permission !== 'denied') {
+      Notification.requestPermission().then(function (permission) {
+        console.log('[DirectNotifications] Permission request result:', permission);
         if (permission === 'granted') {
           createAndShowNotification(options);
-        } else {
-          console.warn('Notification permission denied');
         }
       });
       return false;
+    } else {
+      console.warn('[DirectNotifications] Notification permission denied.');
+      return false;
     }
-    
-    // Show notification if permission is already granted
-    return createAndShowNotification(options);
   } catch (error) {
-    console.error('Error showing direct notification:', error);
+    console.error('[DirectNotifications] Error showing direct notification:', error);
     return false;
   }
 };
@@ -44,8 +44,8 @@ export const showDirectNotification = (options) => {
  * @returns {boolean} - Whether the notification was shown
  */
 const createAndShowNotification = (options) => {
+  console.log('[DirectNotifications] createAndShowNotification called with:', options?.title || options, options);
   try {
-    // Create notification with dark theme styling (high contrast as per user preference)
     const notification = new Notification(options.title, {
       body: options.body,
       icon: '/logo192.png',
@@ -54,22 +54,21 @@ const createAndShowNotification = (options) => {
       vibrate: [200, 100, 200],
       data: options.data || {}
     });
-    
+    console.log('[DirectNotifications] Notification object created:', notification);
     // Add click handler
-    notification.onclick = () => {
+    notification.onclick = (event) => {
+      console.log('[DirectNotifications] Notification clicked:', event);
       notification.close();
       window.focus();
-      
       // Navigate to URL if provided
       if (options.data?.url) {
         window.location.href = options.data.url;
       }
     };
-    
-    console.log('Direct notification shown:', options.title);
+    console.log('[DirectNotifications] Direct notification shown:', options.title);
     return true;
   } catch (error) {
-    console.error('Error creating notification:', error);
+    console.error('[DirectNotifications] Error creating notification:', error);
     return false;
   }
 };

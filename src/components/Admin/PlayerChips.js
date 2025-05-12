@@ -23,7 +23,14 @@ export default function PlayerChips({ players, playersData, onRemove, gameId }) 
             onDelete={onRemove ? () => onRemove(gameId, playerId) : undefined}
             color="primary"
             variant="outlined"
-            sx={{ mb: 0.5 }}
+            sx={(theme) => ({
+              mb: 0.5,
+              backgroundColor: theme.palette.mode === 'dark' ? '#2A2A2A' : undefined,
+              color: theme.palette.mode === 'dark' ? '#FFFFFF' : undefined,
+              border: theme.palette.mode === 'dark' ? '2px solid #FFFFFF' : undefined,
+              fontWeight: 600,
+              letterSpacing: '0.5px',
+            })}
           />
         );
       })}

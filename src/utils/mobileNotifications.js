@@ -1,5 +1,6 @@
 import { Capacitor } from '@capacitor/core';
-import { FirebaseX } from '@ionic-native/firebase-x';
+// Use direct plugin access for FirebaseX
+const FirebaseX = Capacitor.isNativePlatform() ? window.FirebasePlugin : null;
 
 /**
  * Initialize mobile push notifications
@@ -9,28 +10,47 @@ import { FirebaseX } from '@ionic-native/firebase-x';
  */
 export const initMobileNotifications = async (onTokenReceived, onMessageReceived) => {
   // Only run in native mobile environment
-  if (!Capacitor.isNativePlatform()) {
-    console.log('[Mobile Notifications] Not running in native environment, skipping initialization');
+  if (!Capacitor.isNativePlatform() || !FirebaseX) {
+    console.log('[Mobile Notifications] Not running in native environment or FirebaseX not available, skipping initialization');
     return false;
   }
 
   try {
     console.log('[Mobile Notifications] Initializing mobile notifications');
     
-    // Get FCM token
-    const token = await FirebaseX.getToken();
-    console.log('[Mobile Notifications] FCM Token:', token);
+    // Request permission first
+    await requestMobileNotificationPermission();
     
-    // Call the callback with the token
-    if (token && typeof onTokenReceived === 'function') {
-      onTokenReceived(token);
-    }
+    // Get FCM token
+    FirebaseX.getToken((token) => {
+      console.log('[Mobile Notifications] FCM Token:', token);
+      
+      // Call the callback with the token
+      if (token && typeof onTokenReceived === 'function') {
+        onTokenReceived(token);
+      }
+    }, (error) => {
+      console.error('[Mobile Notifications] Error getting token:', error);
+    });
     
     // Listen for foreground messages
     if (typeof onMessageReceived === 'function') {
-      FirebaseX.onMessageReceived().subscribe(data => {
+      FirebaseX.onMessageReceived((data) => {
         console.log('[Mobile Notifications] Push received:', data);
-        onMessageReceived(data);
+        
+        // Format the notification data to match web format
+        const formattedData = {
+          notification: {
+            title: data.title || data.messageTitle || '',
+            body: data.body || data.message || '',
+            icon: data.icon || '/favicon-96x96.png'
+          },
+          data: data.tap ? { ...data } : { ...data, tap: 'foreground' }
+        };
+        
+        onMessageReceived(formattedData);
+      }, (error) => {
+        console.error('[Mobile Notifications] Error receiving message:', error);
       });
     }
     
@@ -54,18 +74,33 @@ export const isMobileNative = () => {
  * @returns {Promise<boolean>}
  */
 export const requestMobileNotificationPermission = async () => {
-  if (!Capacitor.isNativePlatform()) {
+  if (!Capacitor.isNativePlatform() || !FirebaseX) {
     return false;
   }
   
-  try {
-    const result = await FirebaseX.hasPermission();
-    if (!result) {
-      await FirebaseX.grantPermission();
+  return new Promise((resolve) => {
+    try {
+      FirebaseX.hasPermission((hasPermission) => {
+        console.log('[Mobile Notifications] Has permission:', hasPermission);
+        
+        if (!hasPermission) {
+          FirebaseX.grantPermission((granted) => {
+            console.log('[Mobile Notifications] Permission granted:', granted);
+            resolve(true);
+          }, (error) => {
+            console.error('[Mobile Notifications] Error granting permission:', error);
+            resolve(false);
+          });
+        } else {
+          resolve(true);
+        }
+      }, (error) => {
+        console.error('[Mobile Notifications] Error checking permission:', error);
+        resolve(false);
+      });
+    } catch (error) {
+      console.error('[Mobile Notifications] Error requesting permission:', error);
+      resolve(false);
     }
-    return true;
-  } catch (error) {
-    console.error('[Mobile Notifications] Error requesting permission:', error);
-    return false;
-  }
+  });
 };

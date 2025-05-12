@@ -28,7 +28,7 @@ import {
   Fullscreen as FullscreenIcon,
   FullscreenExit as FullscreenExitIcon
 } from '@mui/icons-material';
-import { motion } from 'framer-motion';
+// framer-motion import removed
 import './TournamentVisualizer.css';
 
 // Additional styles for the enhanced visualizer
@@ -470,10 +470,7 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
         </Box>
       </Box>
       
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
+      <div
         style={{
           transition: 'all 0.3s ease-in-out',
           ...(isRotated && {
@@ -531,11 +528,7 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
               <Grid container spacing={2}>
                 {highlightsData?.map((highlight, index) => (
                   <Grid item xs={6} sm={4} key={index} sx={{ minWidth: 0 }}>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.3, delay: index * 0.1 }}
-                    >
+                    <div>
                       <Card 
                         elevation={2} 
                         sx={{ 
@@ -564,7 +557,7 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
                           </Typography>
                         </CardContent>
                       </Card>
-                    </motion.div>
+                    </div>
                   </Grid>
                 ))}
               </Grid>
@@ -572,11 +565,7 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
             
             {/* Champion Card */}
             <Grid item xs={12} md={4}>
-              <motion.div
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ duration: 0.5, delay: 0.3 }}
-              >
+              <div>
                 <Card 
                   elevation={3} 
                   sx={{ 
@@ -625,7 +614,7 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
                     )}
                   </CardContent>
                 </Card>
-              </motion.div>
+              </div>
             </Grid>
           </Grid>
           
@@ -645,15 +634,13 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
                   );
                   const progressPercent = totalMatches > 0 ? (completedMatches / totalMatches) * 100 : 0;
                   return (
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${progressPercent}%` }}
-                      transition={{ duration: 1, delay: 0.5 }}
+                    <div
                       style={{ 
                         position: 'absolute', 
                         left: 0, 
                         top: 0, 
-                        height: '100%', 
+                        height: '100%',
+                        width: `${progressPercent}%`, 
                         background: 'linear-gradient(90deg, #48bb78 0%, #38b2ac 100%)'
                       }}
                     />
@@ -670,14 +657,10 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
             </Box>
           )}
         </Paper>
-      </motion.div>
+      </div>
       
       {/* Tournament Bracket Visualization */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5, delay: 0.3 }}
-      >
+      <div>
         <Paper 
           elevation={darkMode ? 6 : 3} 
           sx={{ 
@@ -733,7 +716,7 @@ const TournamentVisualizerEnhanced = ({ rounds, teams, format, displayDate, disp
             </>
           )}
         </Paper>
-      </motion.div>
+      </div>
     </Box>
   );
 };
@@ -1749,3 +1732,4 @@ const calculateTeamStats = (teams, rounds) => {
 };
 
 export default TournamentVisualizerEnhanced;
+

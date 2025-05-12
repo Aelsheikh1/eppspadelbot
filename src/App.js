@@ -84,9 +84,9 @@ const createAppTheme = (mode) => createTheme({
     },
     background: {
       default: mode === 'dark' ? '#121212' : '#f5f5f5',
-      paper: mode === 'dark' ? '#1e1e1e' : '#ffffff',
-      card: mode === 'dark' ? '#242526' : '#ffffff', // Custom background for cards
-      cardHover: mode === 'dark' ? '#2d2d2e' : '#f5f5f5', // Hover state for cards
+      paper: mode === 'dark' ? '#2A2A2A' : '#ffffff',
+      card: mode === 'dark' ? '#2A2A2A' : '#ffffff', // Custom background for cards
+      cardHover: mode === 'dark' ? '#333333' : '#f5f5f5', // Hover state for cards
     },
     success: {
       main: mode === 'dark' ? '#66bb6a' : '#4caf50',
@@ -121,12 +121,54 @@ const createAppTheme = (mode) => createTheme({
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-    h6: {
+    h1: {
+      fontSize: '2.5rem',
+      fontWeight: 700,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    h2: {
+      fontSize: '2rem',
       fontWeight: 600,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    h3: {
+      fontSize: '1.75rem',
+      fontWeight: 600,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    h4: {
+      fontSize: '1.5rem',
+      fontWeight: 600,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    h5: {
+      fontSize: '1.25rem',
+      fontWeight: 600,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    h6: {
+      fontSize: '1rem',
+      fontWeight: 600,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    body1: {
+      fontSize: '1rem',
+      lineHeight: 1.5,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
+    },
+    body2: {
+      fontSize: '0.875rem',
+      lineHeight: 1.43,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
     },
     button: {
-      fontWeight: 600,
       textTransform: 'none',
+      fontWeight: 500,
+    },
+    caption: {
+      fontSize: '0.75rem',
+      lineHeight: 1.66,
+      color: mode === 'dark' ? '#FFFFFF' : undefined,
     },
   },
   shape: {

@@ -1,0 +1,76 @@
+ext {
+    androidxAppCompatVersion = project.hasProperty('androidxAppCompatVersion') ? rootProject.ext.androidxAppCompatVersion : '1.7.0'
+    cordovaAndroidVersion = project.hasProperty('cordovaAndroidVersion') ? rootProject.ext.cordovaAndroidVersion : '10.1.1'
+}
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.7.2'
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace "capacitor.cordova.android.plugins"
+    compileSdk project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 35
+    defaultConfig {
+        minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 23
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 35
+        versionCode 1
+        versionName "1.0"
+    }
+    lintOptions {
+        abortOnError false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+    flatDir{
+        dirs 'src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'src/main/libs', include: ['*.jar'])
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "org.apache.cordova:framework:$cordovaAndroidVersion"
+    // SUB-PROJECT DEPENDENCIES START
+    implementation "com.google.android.gms:play-services-tagmanager:18.1.1"
+    implementation "com.google.android.gms:play-services-auth:21.3.0"
+    implementation "com.google.firebase:firebase-analytics:22.2.0"
+    implementation "com.google.firebase:firebase-messaging:24.1.0"
+    implementation "com.google.firebase:firebase-config:22.1.0"
+    implementation "com.google.firebase:firebase-perf:21.0.4"
+    implementation "com.google.firebase:firebase-auth:23.2.0"
+    implementation "com.google.firebase:firebase-inappmessaging:21.0.1"
+    implementation "com.google.firebase:firebase-inappmessaging-display:21.0.1"
+    implementation "com.google.firebase:firebase-firestore:25.1.2"
+    implementation "com.google.firebase:firebase-functions:21.1.0"
+    implementation "com.google.firebase:firebase-iid:21.1.0"
+    implementation "com.google.firebase:firebase-installations:18.0.0"
+    implementation "com.google.firebase:firebase-crashlytics:19.4.0"
+    implementation "com.google.firebase:firebase-crashlytics-ndk:19.4.0"
+    implementation "com.google.code.gson:gson:2.11.0"
+    implementation "io.grpc:grpc-okhttp:1.68.0"
+    // SUB-PROJECT DEPENDENCIES END
+}
+
+// PLUGIN GRADLE EXTENSIONS START
+apply from: "cordova.variables.gradle"
+apply from: "../../node_modules/cordova-plugin-firebasex/src/android/build.gradle"
+// PLUGIN GRADLE EXTENSIONS END
+
+for (def func : cdvPluginPostBuildExtras) {
+    func()
+}

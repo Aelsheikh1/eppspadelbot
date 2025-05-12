@@ -90,13 +90,14 @@ export default function LandingPage() {
           justifyContent: 'center',
           minHeight: '100vh',
           background: theme.palette.background.default,
-          px: 2
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundImage: 'radial-gradient(circle at 25px 25px, rgba(0, 0, 0, 0.02) 2%, transparent 0%), radial-gradient(circle at 75px 75px, rgba(0, 0, 0, 0.02) 2%, transparent 0%)',
-            backgroundSize: '100px 100px',
-            opacity: 0.5,
+          px: 2,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundImage: 'radial-gradient(circle at 25px 25px, rgba(0, 0, 0, 0.02) 2%, transparent 0%), radial-gradient(circle at 75px 75px, rgba(0, 0, 0, 0.02) 2%, transparent 0%)',
+          backgroundSize: '100px 100px',
+          opacity: 0.5,
+          zIndex: 1,
             zIndex: 1,
           }
         }}

@@ -18,7 +18,7 @@ const SplashLogo = ({ size = 88 }) => (
     aria-label="EPPS Logo"
   >
     <img
-      src={process.env.PUBLIC_URL + '/web-app-manifest-512x512.png'}
+      src={process.env.PUBLIC_URL + '/logo512.png'}
       alt="EPPS Logo"
       className="splash-logo"
       style={{ width: '100%', height: 'auto', objectFit: 'contain', background: 'none' }}

@@ -20,6 +20,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { registerFCMToken, showLocalNotification } from './services/notificationService';
+import NotificationDebugPanel from './components/NotificationDebugPanel';
 import { initNotificationListener } from './utils/notificationListener';
 import { requestPermission } from './utils/simpleNotifications';
 import { initMobileNotifications, isMobileNative, requestMobileNotificationPermission } from './utils/mobileNotificationsSimple';
@@ -494,6 +495,7 @@ function App() {
   
   return (
     <div className="App">
+      <NotificationDebugPanel />
       <ThemeContext.Provider value={{ themeMode, toggleTheme }}>
         <ThemeProvider theme={theme}>
           <CssBaseline />

@@ -292,10 +292,18 @@ const CustomNotificationSender = () => {
   useEffect(() => {
     const loadUsers = async () => {
       try {
-        const userList = await getNotificationUsers();
-        setUsers(userList);
+        const result = await getNotificationUsers();
+        if (result.success) {
+          setUsers(result.users);
+        } else {
+          setUsers([]);
+          setSnackbarMessage('Failed to load users: ' + result.error);
+          setSnackbarSeverity('error');
+          setSnackbarOpen(true);
+        }
       } catch (error) {
         console.error('Failed to load users:', error);
+        setUsers([]);
         setSnackbarMessage('Failed to load users: ' + error.message);
         setSnackbarSeverity('error');
         setSnackbarOpen(true);

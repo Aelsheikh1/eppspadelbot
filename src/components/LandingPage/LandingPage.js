@@ -97,9 +97,7 @@ export default function LandingPage() {
           backgroundImage: 'radial-gradient(circle at 25px 25px, rgba(0, 0, 0, 0.02) 2%, transparent 0%), radial-gradient(circle at 75px 75px, rgba(0, 0, 0, 0.02) 2%, transparent 0%)',
           backgroundSize: '100px 100px',
           opacity: 0.5,
-          zIndex: 1,
-            zIndex: 1,
-          }
+          zIndex: 1
         }}
       >
         <Container maxWidth="sm" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', px: { xs: 2, sm: 3 } }}>

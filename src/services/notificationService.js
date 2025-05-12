@@ -236,43 +236,5 @@ export const registerFCMToken = async () => {
 };
 
 // Display a notification locally (for testing)
-export const // showLocalNotification is now handled only in the service worker to avoid duplicate notifications = (title, body, data = {}) => {
-  try {
-    if (!('Notification' in window)) {
-      console.warn('Notifications not supported');
-      return false;
-    }
-
-    if (Notification.permission !== 'granted') {
-      console.warn('Notification permission not granted');
-      return false;
-    }
-
-    const options = {
-      body,
-      icon: '/logo192.png',
-      badge: '/logo192.png',
-      data,
-      requireInteraction: true,
-      tag: data.gameId || 'default-notification'
-    };
-
-    const notification = new Notification(title, options);
-
-    notification.onclick = () => {
-      console.log('Notification clicked');
-      notification.close();
-      window.focus();
-
-      // Navigate to game if gameId is provided
-      if (data.gameId) {
-        window.location.href = `/games/${data.gameId}`;
-      }
-    };
-
-    return true;
-  } catch (error) {
-    console.error('Error showing notification:', error);
-    return false;
-  }
-};
+// showLocalNotification is now handled only in the service worker to avoid duplicate notifications.
+// The local notification function has been removed to resolve ESLint parsing errors and prevent in-app notification duplication.

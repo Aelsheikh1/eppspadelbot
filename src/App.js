@@ -19,7 +19,7 @@ import NotificationTestPage from './components/NotificationTestPage';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { registerFCMToken, showLocalNotification } from './services/notificationService';
+import { registerFCMToken } from './services/notificationService';
 import NotificationDebugPanel from './components/NotificationDebugPanel';
 import { initNotificationListener } from './utils/notificationListener';
 import { requestPermission } from './utils/simpleNotifications';
@@ -344,18 +344,6 @@ function AppContent() {
             
             // Show a welcome notification to confirm everything is working
             // Only for first login, not on every reload
-            const lastNotificationShown = localStorage.getItem('lastNotificationShown');
-            const now = new Date().getTime();
-            
-            // Only show welcome notification if it hasn't been shown in the last 24 hours
-            if (!lastNotificationShown || (now - parseInt(lastNotificationShown)) > 24 * 60 * 60 * 1000) {
-              showLocalNotification(
-                'Notifications Enabled', 
-                'You will now receive notifications for game updates!',
-                { type: 'welcome' }
-              );
-              localStorage.setItem('lastNotificationShown', now.toString());
-            }
           } else {
             console.warn('[Notifications] Failed to register FCM token');
           }
@@ -380,20 +368,7 @@ function AppContent() {
   }, [currentUser]);
 
   const triggerTestNotification = () => {
-    // Use our enhanced notification service to show a test notification
-    const success = showLocalNotification(
-      'Test Notification', 
-      'This is a test notification. If you see this, notifications are working correctly!',
-      { type: 'test', timestamp: Date.now() }
-    );
-    
-    if (success) {
-      console.log('[Test] Local notification triggered successfully.');
-    } else {
-      console.warn('[Test] Failed to trigger local notification.');
-      // Fallback to alert if notification fails
-      alert('Could not show notification. Please check your notification permissions.');
-    }
+    alert('This is a test notification. If you see this, notifications are working correctly!');
   };
 
   return (
@@ -461,7 +436,7 @@ function App() {
                   const data = message.data || {};
                   
                   // Show notification using the same format as web
-                  showLocalNotification(title, body, data);
+                  // showLocalNotification removed. Local notifications are now handled only by the service worker.
                 }
               );
               

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -21,7 +21,6 @@ import { useAuth } from '../../contexts/AuthContext';
 
 
 
-import React, { useState, useEffect } from 'react';
 
 export default function LandingPage() {
   const navigate = useNavigate();

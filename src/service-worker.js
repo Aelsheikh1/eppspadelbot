@@ -131,13 +131,12 @@ const messaging = firebase.messaging();
 // Handle background messages
 messaging.onBackgroundMessage(async (payload) => {
   console.log('[Service Worker] Received background message:', payload);
-  
   try {
     const notificationTitle = payload.notification.title;
     const notificationOptions = {
       body: payload.notification.body,
-      icon: '/favicon-96x96.png',
-      badge: '/favicon-96x96.png',
+      icon: '/web-app-manifest-192x192.png', // Use transparent icon
+      badge: '/web-app-manifest-192x192.png',
       data: payload.data,
       actions: [
         {
@@ -145,61 +144,13 @@ messaging.onBackgroundMessage(async (payload) => {
           title: 'View'
         }
       ],
-      tag: payload.data?.notificationId || 'default-notification',
+      tag: payload.data?.notificationId || payload.data?.gameId || 'default-notification',
       requireInteraction: true
     };
-
-    // Get all active notifications
-    const activeNotifications = await self.registration.getNotifications();
-    
-    // Close all notifications with the same tag
-    activeNotifications.forEach(notification => {
-      if (notification.tag === notificationOptions.tag) {
-        notification.close();
-      }
-    });
-
-    // Show the new notification
-    const notification = await self.registration.showNotification(notificationTitle, notificationOptions);
-
-    // Add a timer to close the notification if not interacted with
-    setTimeout(() => {
-      if (notification && !notification.closed) {
-        notification.close();
-      }
-    }, 5000);
-
-    // Add click handler
-    notification.onclick = async () => {
-      console.log('[Service Worker] Notification clicked');
-      
-      try {
-        // Close the notification
-        notification.close();
-
-        // Find and focus existing window
-        const clients = await self.clients.matchAll({
-          type: 'window',
-          includeUncontrolled: true
-        });
-
-        const client = clients.find(c => c.url.startsWith(self.location.origin));
-        
-        if (client) {
-          await client.focus();
-        } else {
-          // Open new window if no existing one
-          await self.clients.openWindow('/');
-        }
-      } catch (error) {
-        console.error('[Service Worker] Error handling notification click:', error);
-      }
-    };
-
-    // Add close handler
-    notification.onclose = () => {
-      console.log('[Service Worker] Notification closed');
-    };
+    // Deduplicate: close notifications with same tag
+    const activeNotifications = await self.registration.getNotifications({ tag: notificationOptions.tag });
+    activeNotifications.forEach(notification => notification.close());
+    await self.registration.showNotification(notificationTitle, notificationOptions);
   } catch (error) {
     console.error('[Service Worker] Error showing notification:', error);
   }
@@ -268,31 +219,34 @@ self.addEventListener('notificationclick', (event) => {
 // Handle push event
 self.addEventListener('push', (event) => {
   console.log('[Service Worker] Push received:', event);
-  
   let notificationData = {
     title: 'EPP Padel Bot',
     body: 'New notification',
-    icon: '/logo192.png',
-    badge: '/logo192.png'
+    icon: '/web-app-manifest-192x192.png', // Use transparent icon
+    badge: '/web-app-manifest-192x192.png',
+    data: {},
+    tag: 'default-notification'
   };
-  
   try {
     if (event.data) {
       const data = event.data.json();
       notificationData = {
-        title: data.notification.title || notificationData.title,
-        body: data.notification.body || notificationData.body,
-        icon: data.notification.icon || notificationData.icon,
-        badge: data.notification.badge || notificationData.badge,
-        data: data.data || {}
+        title: (data.notification && data.notification.title) || notificationData.title,
+        body: (data.notification && data.notification.body) || notificationData.body,
+        icon: (data.notification && data.notification.icon) || notificationData.icon,
+        badge: (data.notification && data.notification.badge) || notificationData.badge,
+        data: data.data || {},
+        tag: (data.data && (data.data.notificationId || data.data.gameId)) || 'default-notification'
       };
     }
   } catch (error) {
     console.error('[Service Worker] Error parsing push data:', error);
   }
-  
-  event.waitUntil(
-    self.registration.showNotification(notificationData.title, {
+  event.waitUntil((async () => {
+    // Deduplicate: close notifications with same tag
+    const activeNotifications = await self.registration.getNotifications({ tag: notificationData.tag });
+    activeNotifications.forEach(notification => notification.close());
+    await self.registration.showNotification(notificationData.title, {
       body: notificationData.body,
       icon: notificationData.icon,
       badge: notificationData.badge,
@@ -302,7 +256,9 @@ self.addEventListener('push', (event) => {
           action: 'view',
           title: 'View'
         }
-      ]
-    })
-  );
+      ],
+      tag: notificationData.tag,
+      requireInteraction: true
+    });
+  })());
 });

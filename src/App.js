@@ -396,6 +396,14 @@ function AppContent() {
 }
 
 function App() {
+  // Splash screen state
+  const [showSplash, setShowSplash] = useState(true);
+
+  useEffect(() => {
+    // Minimum splash duration (ms)
+    const splashTimeout = setTimeout(() => setShowSplash(false), 3000);
+    return () => clearTimeout(splashTimeout);
+  }, []);
   // Get stored theme preference or default to 'dark'
   const [themeMode, setThemeMode] = useState(() => {
     const savedTheme = localStorage.getItem('themeMode');
@@ -470,6 +478,71 @@ function App() {
   
   return (
     <div className="App">
+      {/* Splash Overlay */}
+      {showSplash && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: themeMode === 'dark' ? '#2A2A2A' : '#FFFFFF',
+            zIndex: 2000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'opacity 0.5s',
+            opacity: showSplash ? 1 : 0,
+          }}
+        >
+          <div style={{ marginBottom: 32 }}>
+            {/* Logo */}
+            <img
+              src={process.env.PUBLIC_URL + '/logo512.png'}
+              alt="EPPS Logo"
+              style={{
+                width: '60vw',
+                maxWidth: 300,
+                minWidth: 120,
+                height: 'auto',
+                display: 'block',
+                objectFit: 'contain',
+                margin: '0 auto 40px auto',
+                borderRadius: 24,
+                boxShadow: '0 4px 32px rgba(0,0,0,0.18)',
+                background: 'none'
+              }}
+            />
+          </div>
+          {/* Animated Spinner */}
+          <div className="splash-spinner" style={{ width: 56, height: 56, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="56" height="56" viewBox="0 0 56 56">
+              <circle
+                cx="28"
+                cy="28"
+                r="22"
+                stroke="#fff"
+                strokeWidth="6"
+                fill="none"
+                strokeDasharray="34 100"
+                strokeLinecap="round"
+              >
+                <animateTransform
+                  attributeName="transform"
+                  type="rotate"
+                  from="0 28 28"
+                  to="360 28 28"
+                  dur="1s"
+                  repeatCount="indefinite"
+                />
+              </circle>
+            </svg>
+          </div>
+        </div>
+      )}
+
       <NotificationDebugPanel />
       <ThemeContext.Provider value={{ themeMode, toggleTheme }}>
         <ThemeProvider theme={theme}>

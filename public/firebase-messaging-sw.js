@@ -16,6 +16,35 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Handle background messages
+messaging.onBackgroundMessage(function(payload) {
+  console.log('[firebase-messaging-sw.js] Received background message:', payload);
+  const data = payload.data || {};
+  let actions = [];
+  let urlToOpen = '/';
+  if (data.gameId) {
+    actions.push({ action: 'join', title: 'Join Game' });
+    urlToOpen = `/games/${data.gameId}`;
+  } else if (data.tournamentId || data.messageType === 'tournament_update') {
+    actions.push({ action: 'view', title: 'View Message' });
+    urlToOpen = `/tournaments/${data.tournamentId || ''}`;
+  }
+  const notificationOptions = {
+    body: payload.notification.body,
+    icon: '/logo192.png',
+    badge: '/logo192.png',
+    data: { ...data, url: urlToOpen },
+    actions: actions,
+    tag: data.notificationId || 'default-notification',
+    requireInteraction: true
+  };
+  // Close any previous notifications with the same tag
+  self.registration.getNotifications({ tag: notificationOptions.tag }).then(notifications => {
+    notifications.forEach(notification => notification.close());
+    self.registration.showNotification(payload.notification.title, notificationOptions);
+  });
+});
+
 // Log initialization with version info for debugging
 console.log('[Service Worker] Firebase Messaging initialized - Version 1.0.1');
 
@@ -36,23 +65,21 @@ self.addEventListener('activate', (event) => {
 
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
-  console.log('[Service Worker] Notification clicked:', event.notification.tag);
   event.notification.close();
-  
-  // Get notification data
-  const notificationData = event.notification.data || {};
-  const urlToOpen = notificationData.url || '/';
-  
-  // Focus on existing window or open a new one
+  const data = event.notification.data || {};
+  let urlToOpen = data.url || '/';
+  if (event.action === 'join' && data.gameId) {
+    urlToOpen = `/games/${data.gameId}`;
+  } else if (event.action === 'view' && (data.tournamentId || data.messageType === 'tournament_update')) {
+    urlToOpen = `/tournaments/${data.tournamentId || ''}`;
+  }
   event.waitUntil(
-    clients.matchAll({type: 'window'}).then(clientList => {
-      // Check if there is already a window/tab open with the target URL
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
       for (const client of clientList) {
         if (client.url === urlToOpen && 'focus' in client) {
           return client.focus();
         }
       }
-      // If no window/tab is open, open a new one
       if (clients.openWindow) {
         return clients.openWindow(urlToOpen);
       }

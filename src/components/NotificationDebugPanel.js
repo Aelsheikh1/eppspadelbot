@@ -45,6 +45,9 @@ const NotificationDebugPanel = () => {
     }
   };
 
+  if (typeof window !== 'undefined' && localStorage.DEBUG_NOTIFICATIONS !== 'true') {
+    return null;
+  }
   return (
     <div style={{ background: '#222', color: '#fff', padding: 16, borderRadius: 8, margin: 16, fontSize: 14 }}>
       <h3>Notification Debug Panel</h3>

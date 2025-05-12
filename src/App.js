@@ -22,7 +22,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import { registerFCMToken, showLocalNotification } from './services/notificationService';
 import { initNotificationListener } from './utils/notificationListener';
 import { requestPermission } from './utils/simpleNotifications';
-import { initMobileNotifications, isMobileNative, requestMobileNotificationPermission } from './utils/mobileNotifications';
+import { initMobileNotifications, isMobileNative, requestMobileNotificationPermission } from './utils/mobileNotificationsSimple';
 import { storeMobileToken } from './services/mobileTokenService';
 
 // Create Theme Context

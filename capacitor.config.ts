@@ -2,22 +2,30 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.epps.padel',
-  appName: 'EPPS Padel',
+  appName: 'EPPS PADELBOLT',
   webDir: 'build',
   plugins: {
     FirebaseX: {
-      // These are placeholder values - you'll need to replace them with your actual Firebase config values
+      // Firebase Cloud Messaging (FCM) configuration
+      FIREBASE_MESSAGING_AUTO_INIT_ENABLED: true,
+      FIREBASE_MESSAGING_SENDER_ID: '773090904452',
+      FIREBASE_MESSAGING_VAPID_KEY: 'BMzSIFpKw-T23cx8aoIfssl2Q8oYxKZVIXY5qYkrAVOzXXOzN3eIhhyQhsuA6_mnC4go0hk9IWQ06Dwqe-eHSfE',
+      FIREBASE_MESSAGING_IMMEDIATE_PAYLOAD_DELIVERY: true,
       FIREBASE_ANALYTICS_COLLECTION_ENABLED: true,
       FIREBASE_PERFORMANCE_COLLECTION_ENABLED: true,
       FIREBASE_CRASHLYTICS_COLLECTION_ENABLED: true,
-      ANDROID_ICON_ACCENT_COLOR: '#2A2A2A', // Using your preferred dark mode color
-      ANDROID_NOTIFICATION_COLOR: '#2A2A2A', // Using your preferred dark mode color
+      ANDROID_ICON_ACCENT_COLOR: '#2A2A2A',
+      ANDROID_ICON_NAME: '@mipmap/ic_launcher',
+      ANDROID_NOTIFICATION_ICON_NAME: '@mipmap/ic_launcher_notification',
+      ANDROID_NOTIFICATION_COLOR: '#2A2A2A', 
       ANDROID_FIREBASE_CONFIG_FILEPATH: './google-services.json',
       IOS_FIREBASE_CONFIG_FILEPATH: './GoogleService-Info.plist'
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
     }
   },
   server: {
-    // Allow Capacitor to access your deployed web app
     // For development
     // url: 'http://localhost:3000',
     // For production (replace with your actual Vercel URL)

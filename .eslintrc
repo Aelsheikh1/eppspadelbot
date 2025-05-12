@@ -1,0 +1,9 @@
+{
+  "extends": ["react-app"],
+  "rules": {
+    "no-unused-vars": "off",
+    "no-redeclare": "off",
+    "react-hooks/exhaustive-deps": "off",
+    "default-case": "off"
+  }
+}

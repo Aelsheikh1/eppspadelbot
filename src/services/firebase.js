@@ -9,6 +9,7 @@ import {
   browserLocalPersistence,
   setPersistence
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import {
   getFirestore,
   doc,
@@ -906,48 +907,64 @@ export const requestFcmToken = async () => {
       return null;
     }
 
-    // Request permission if not already granted
-    if (Notification.permission !== 'granted') {
-      console.log('[FCM] Requesting notification permission...');
-      const permission = await Notification.requestPermission();
-      if (permission !== 'granted') {
-        console.warn('[FCM] Notification permission denied by user');
-        return null;
-      }
-    }
-
-    // Get current user
     const currentUser = auth.currentUser;
     if (!currentUser) {
       console.warn('[FCM] No authenticated user for token registration');
       return null;
     }
-
-    // Wait for service worker to be ready
-    if ('serviceWorker' in navigator) {
-      await navigator.serviceWorker.ready;
-      console.log('[FCM] Service worker is ready for messaging');
+    
+    let token = null;
+    
+    // Check if we're running in a native mobile environment
+    const isNativeMobile = Capacitor.isNativePlatform();
+    
+    if (isNativeMobile) {
+      // For mobile, we'll rely on the FirebaseX plugin
+      // The actual token will be handled by the mobileNotifications.js utility
+      // and passed back to this function via the storeToken function
+      console.log('[FCM] Running in native mobile environment, token will be handled by FirebaseX');
+      // Return a placeholder - the actual token will be handled by the mobile notifications module
+      return 'mobile-pending';
+    } else {
+      // Web browser implementation
+      // Check if notification permission is granted
+      if (!('Notification' in window)) {
+        console.warn('[FCM] This browser does not support notifications');
+        return null;
+      }
+      
+      if (Notification.permission !== 'granted') {
+        console.warn('[FCM] Notification permission not granted');
+        return null;
+      }
+      
+      // Get FCM token
+      const messaging = getMessaging(app);
+      
+      try {
+        // Ensure service worker is registered
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (!registration) {
+          console.warn('[FCM] No service worker registration found');
+          return null;
+        }
+        
+        token = await getToken(messaging, {
+          vapidKey: VAPID_KEY,
+          serviceWorkerRegistration: registration
+        });
+        
+        if (!token) {
+          console.warn('[FCM] No FCM token received');
+          return null;
+        }
+        
+        console.log('[FCM] Token received:', token.substring(0, 10) + '...');
+      } catch (err) {
+        console.error('[FCM] Error getting token:', err);
+        return null;
+      }
     }
-
-    // Get FCM token
-    console.log('[FCM] Getting token for user:', currentUser.uid);
-    const messaging = getMessaging(app);
-    
-    // Ensure service worker is ready before getting token
-    const swRegistration = await navigator.serviceWorker.ready;
-    console.log('[FCM] Service worker ready for token request');
-    
-    const token = await getToken(messaging, { 
-      vapidKey: VAPID_KEY,
-      serviceWorkerRegistration: swRegistration
-    });
-    
-    if (!token) {
-      console.error('[FCM] Failed to get FCM token');
-      return null;
-    }
-
-    console.log('[FCM] Token obtained:', token.substring(0, 10) + '...');
     
     // Send token to service worker if available with user information
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {

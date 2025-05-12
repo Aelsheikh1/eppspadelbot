@@ -22,6 +22,8 @@ import 'react-toastify/dist/ReactToastify.css';
 import { registerFCMToken, showLocalNotification } from './services/notificationService';
 import { initNotificationListener } from './utils/notificationListener';
 import { requestPermission } from './utils/simpleNotifications';
+import { initMobileNotifications, isMobileNative, requestMobileNotificationPermission } from './utils/mobileNotifications';
+import { storeMobileToken } from './services/mobileTokenService';
 
 // Create Theme Context
 const ThemeContext = createContext();
@@ -426,9 +428,42 @@ function App() {
   
   // Initialize the custom notification listener when the app loads
   useEffect(() => {
-    // Request notification permission on app load
-    requestPermission();
-    initNotificationListener();
+    const initializeNotifications = async () => {
+      // Check if we're running in a native mobile environment
+      if (isMobileNative()) {
+        console.log('[App] Running in native mobile environment, initializing mobile notifications');
+        // Request permission for mobile notifications
+        await requestMobileNotificationPermission();
+        
+        // Initialize mobile notifications with callbacks
+        initMobileNotifications(
+          // Token received callback
+          (token) => {
+            console.log('[App] Mobile FCM token received:', token);
+            // Store the token in Firebase
+            storeMobileToken(token);
+          },
+          // Message received callback
+          (message) => {
+            console.log('[App] Mobile push notification received:', message);
+            // Show notification using the same format as web
+            showLocalNotification(
+              message.title || 'New Notification',
+              message.body || '',
+              message.data || {}
+            );
+          }
+        );
+      } else {
+        // Web browser environment
+        console.log('[App] Running in web environment, initializing web notifications');
+        // Request notification permission on app load
+        requestPermission();
+        initNotificationListener();
+      }
+    };
+    
+    initializeNotifications();
   }, []); 
   
   // Toggle theme function

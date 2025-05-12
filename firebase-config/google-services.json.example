@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "773090904452",
+    "project_id": "padelbolt-5d9a2",
+    "storage_bucket": "padelbolt-5d9a2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:773090904452:android:YOUR_ANDROID_APP_ID",
+        "android_client_info": {
+          "package_name": "com.epps.padel"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "YOUR_ANDROID_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

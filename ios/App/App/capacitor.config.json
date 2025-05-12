@@ -1,41 +1,23 @@
 {
-	"appId": "com.padelbolt.app",
-	"appName": "PadelBolt",
+	"appId": "com.epps.padel",
+	"appName": "EPPS Padel",
 	"webDir": "build",
-	"server": {
-		"androidScheme": "https",
-		"cleartext": true,
-		"allowNavigation": [
-			"localhost",
-			"*.firebaseapp.com",
-			"*.firebase.com"
-		]
-	},
 	"plugins": {
-		"PushNotifications": {
-			"presentationOptions": [
-				"badge",
-				"sound",
-				"alert"
-			]
-		},
 		"FirebaseX": {
-			"apiKey": "AIzaSyAyZAakNVP3eOnIeJ1qB1Ki-6qRgZ4VBg8",
-			"authDomain": "padelbolt-5d9a2.firebaseapp.com",
-			"projectId": "padelbolt-5d9a2",
-			"storageBucket": "padelbolt-5d9a2.firebasestorage.app",
-			"messagingSenderId": "773090904452",
-			"appId": "1:773090904452:web:e33380da424fe8d69e75d1",
-			"measurementId": "G-1PRKH5C8NV"
+			"FIREBASE_ANALYTICS_COLLECTION_ENABLED": true,
+			"FIREBASE_PERFORMANCE_COLLECTION_ENABLED": true,
+			"FIREBASE_CRASHLYTICS_COLLECTION_ENABLED": true,
+			"ANDROID_ICON_ACCENT_COLOR": "#2A2A2A",
+			"ANDROID_NOTIFICATION_COLOR": "#2A2A2A",
+			"ANDROID_FIREBASE_CONFIG_FILEPATH": "./google-services.json",
+			"IOS_FIREBASE_CONFIG_FILEPATH": "./GoogleService-Info.plist"
 		}
 	},
-	"style": {
-		"androidStatusBarColor": "#2A2A2A",
-		"androidNavigationBarColor": "#2A2A2A",
-		"androidWindowSplashScreenBackground": "#2A2A2A"
+	"server": {
+		"url": "http://localhost:3000",
+		"cleartext": true
 	},
 	"packageClassList": [
-		"PushNotificationsPlugin",
 		"CDVPlugin"
 	]
 }

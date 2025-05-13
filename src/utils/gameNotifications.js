@@ -1,6 +1,7 @@
 import { db } from '../services/firebase';
 import { collection, addDoc, query, where, getDocs, doc, getDoc, serverTimestamp } from 'firebase/firestore';
-import { sendFCMNotification } from './fcmNotifications';
+// import { sendFCMNotification } from './fcmNotifications';
+import { sendCustomNotification } from './customNotificationSender';
 import { format } from 'date-fns';
 
 /**
@@ -121,10 +122,13 @@ export const sendGameNotification = async (type, gameData, specificUserIds = nul
 
     // Send FCM notifications to all users
     if (userIds.length > 0) {
-      await sendFCMNotification(userIds, {
+      await sendCustomNotification({
         title: notificationDetails.title,
         body: notificationDetails.body,
-        data: notificationDetails.data
+        targetUserId: null,
+        targetRole: null,
+        gameId: gameData.id,
+        url: notificationDetails.data?.url
       });
     }
 

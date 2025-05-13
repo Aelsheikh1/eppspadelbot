@@ -21,21 +21,32 @@ export const sendCustomNotification = async (options) => {
     
     // Use Firebase Functions to send notification via FCM
     const { getFunctions, httpsCallable } = await import('firebase/functions');
-    const functions = getFunctions();
+    // Always use the correct region for callable functions
+    const functions = getFunctions(undefined, 'us-central1');
 
     // Choose the correct function: direct or all
     let callableFn;
     let payload;
     if (targetUserId) {
       callableFn = httpsCallable(functions, 'sendDirectNotification');
+      // Fetch FCM tokens for the target user
+      const tokensSnapshot = await getDocs(query(collection(db, 'fcmTokens'), where('userId', '==', targetUserId)));
+      const tokens = tokensSnapshot.docs.map(doc => doc.data().token).filter(Boolean);
+      if (!tokens.length) {
+        return {
+          success: false,
+          error: 'No FCM tokens found for the target user.'
+        };
+      }
       payload = {
         title,
         body,
-        tokens: [targetUserId], // You may need to resolve userId to tokens in backend
+        tokens,
         gameId,
         notificationType: targetRole || 'user',
         url,
       };
+
     } else {
       callableFn = httpsCallable(functions, 'sendNotificationToAll');
       payload = {

@@ -39,46 +39,8 @@ export const saveFCMToken = async (userId) => {
   }
 };
 
-// Send FCM notification to specific users
-export const sendFCMNotification = async (userIds, notification) => {
-  try {
-    // Get tokens for all users
-    const tokens = [];
-    for (const userId of userIds) {
-      const userTokenRef = doc(db, 'userTokens', userId);
-      const userTokenDoc = await getDoc(userTokenRef);
-      if (userTokenDoc.exists() && userTokenDoc.data().fcmToken) {
-        tokens.push(userTokenDoc.data().fcmToken);
-      }
-    }
-
-    if (tokens.length === 0) {
-      console.log('No valid FCM tokens found');
-      return;
-    }
-
-    // Send notification to Cloud Function
-    const response = await fetch('https://us-central1-padelbolt-5d9a2.cloudfunctions.net/sendNotification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        tokens: tokens,
-        notification: {
-          title: notification.title,
-          body: notification.body,
-          icon: '/logo192.png',
-          data: notification.data || {}
-        }
-      })
-    });
-
-    const result = await response.json();
-    console.log('FCM notification sent:', result);
-    return result;
-  } catch (error) {
-    console.error('Error sending FCM notification:', error);
-    throw error;
-  }
+// DEPRECATED: Do not use this function in frontend builds.
+// All notification sending must go through Firebase callable functions to avoid CORS issues.
+export const sendFCMNotification = async () => {
+  throw new Error('[DEPRECATED] sendFCMNotification is not available in frontend build. Use a Firebase callable function (e.g., sendDirectNotification) instead.');
 };

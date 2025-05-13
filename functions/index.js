@@ -18,10 +18,10 @@ if (fs.existsSync('./service-account.json')) {
   };
 } else {
   // Use environment variables in production
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-  const databaseURL = process.env.FIREBASE_DATABASE_URL || `https://${projectId}.firebaseio.com`;
+  const projectId = process.env.PROJECT_ID || 'your-default-project-id';
+  const clientEmail = process.env.CLIENT_EMAIL;
+  const privateKey = process.env.PRIVATE_KEY?.replace(/\\n/g, '\n');
+  const databaseURL = process.env.DATABASE_URL || `https://${projectId}.firebaseio.com`;
   
   firebaseConfig = {
     credential: admin.credential.cert({

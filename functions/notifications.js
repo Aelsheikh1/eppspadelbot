@@ -59,6 +59,27 @@ async function sendEventPushNotification({ eventType, title, body, data = {}, us
         link: data.url || 'https://eppspadelbot.vercel.app'
       }
     },
+    android: {
+      notification: {
+        title,
+        body,
+        icon: 'ic_notification', // use your app icon or default
+        color: '#2A2A2A',
+        channel_id: 'default',
+      }
+    },
+    apns: {
+      payload: {
+        aps: {
+          alert: {
+            title,
+            body
+          },
+          sound: 'default',
+          badge: 1
+        }
+      }
+    },
     tokens
   };
   const response = await admin.messaging().sendMulticast(message);
@@ -312,6 +333,27 @@ exports.sendDirectNotification = functions.https.onCall(async (data, context) =>
         },
         fcmOptions: {
           link: gameId ? `https://eppspadelbot.vercel.app/games/${gameId}` : 'https://eppspadelbot.vercel.app'
+        }
+      },
+      android: {
+        notification: {
+          title,
+          body,
+          icon: 'ic_notification', // use your app icon or default
+          color: '#2A2A2A',
+          channel_id: 'default',
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            alert: {
+              title,
+              body
+            },
+            sound: 'default',
+            badge: 1
+          }
         }
       },
       tokens

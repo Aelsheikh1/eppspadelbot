@@ -90,11 +90,16 @@ self.addEventListener('message', (event) => {
     const messaging = firebase.messaging();
     
     // Reattach background message handler
-    messaging.onBackgroundMessage((payload) => {
+    messaging.onBackgroundMessage(async (payload) => {
       console.log('[Service Worker] Received background message:', payload);
-      
       try {
         const notificationTitle = payload.notification.title;
+        const tag = (payload.data && (payload.data.notificationId || payload.data.gameId)) || 'default-notification';
+        if (shownNotificationTags.has(tag)) {
+          console.log('[Service Worker] Skipping duplicate notification (background):', tag);
+          return;
+        }
+        shownNotificationTags.add(tag);
         const notificationOptions = {
           body: payload.notification.body,
           icon: '/logo192.png',
@@ -105,9 +110,9 @@ self.addEventListener('message', (event) => {
               action: 'view',
               title: 'View'
             }
-          ]
+          ],
+          tag
         };
-
         self.registration.showNotification(notificationTitle, notificationOptions);
       } catch (error) {
         console.error('[Service Worker] Error showing notification:', error);
@@ -115,6 +120,9 @@ self.addEventListener('message', (event) => {
     });
   }
 });
+
+// Deduplication: Track shown notification tags for this SW lifetime
+const shownNotificationTags = new Set();
 
 // Firebase messaging configuration
 firebase.initializeApp({
@@ -243,6 +251,12 @@ self.addEventListener('push', (event) => {
     console.error('[Service Worker] Error parsing push data:', error);
   }
   event.waitUntil((async () => {
+    // Deduplicate: only show if not already shown
+    if (shownNotificationTags.has(notificationData.tag)) {
+      console.log('[Service Worker] Skipping duplicate notification (push):', notificationData.tag);
+      return;
+    }
+    shownNotificationTags.add(notificationData.tag);
     // Deduplicate: close notifications with same tag
     const activeNotifications = await self.registration.getNotifications({ tag: notificationData.tag });
     activeNotifications.forEach(notification => notification.close());

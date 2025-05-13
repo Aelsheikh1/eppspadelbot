@@ -1,6 +1,71 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 
+/**
+ * Send push notifications for a specific event type to all users who opted in.
+ * @param {Object} param0 { eventType, title, body, data, userIdsOverride }
+ */
+async function sendEventPushNotification({ eventType, title, body, data = {}, userIdsOverride = null }) {
+  // 1. Get all users who have enabled this event in their notificationSettings
+  let userIds = [];
+  if (userIdsOverride) {
+    userIds = userIdsOverride;
+  } else {
+    const usersSnapshot = await admin.firestore().collection('users').get();
+    usersSnapshot.forEach(doc => {
+      const settings = doc.data().notificationSettings || {};
+      if (settings[eventType]) {
+        userIds.push(doc.id);
+      }
+    });
+  }
+  if (userIds.length === 0) {
+    console.log(`No users opted in for ${eventType}`);
+    return { success: true, successCount: 0 };
+  }
+  // 2. Get FCM tokens for these users
+  let tokens = [];
+  if (userIds.length > 10) {
+    // Firestore 'in' queries are limited to 10 items per query
+    for (let i = 0; i < userIds.length; i += 10) {
+      const batchIds = userIds.slice(i, i + 10);
+      const tokensSnapshot = await admin.firestore().collection('fcmTokens').where('userId', 'in', batchIds).get();
+      tokens.push(...tokensSnapshot.docs.map(doc => doc.data().token));
+    }
+  } else {
+    const tokensSnapshot = await admin.firestore().collection('fcmTokens').where('userId', 'in', userIds).get();
+    tokens = tokensSnapshot.docs.map(doc => doc.data().token);
+  }
+  if (tokens.length === 0) {
+    console.log(`No tokens found for users of ${eventType}`);
+    return { success: true, successCount: 0 };
+  }
+  // 3. Build and send the notification
+  const message = {
+    notification: { title, body },
+    data: { ...data, type: eventType, timestamp: Date.now().toString() },
+    webpush: {
+      notification: {
+        icon: '/logo192.png',
+        badge: '/logo192.png',
+        vibrate: [200, 100, 200],
+        requireInteraction: true,
+        actions: [
+          { action: 'open', title: 'View' },
+          { action: 'close', title: 'Dismiss' }
+        ]
+      },
+      fcmOptions: {
+        link: data.url || 'https://eppspadelbot.vercel.app'
+      }
+    },
+    tokens
+  };
+  const response = await admin.messaging().sendMulticast(message);
+  console.log(`Sent ${eventType} notification to ${response.successCount} devices`);
+  return { success: true, successCount: response.successCount };
+}
+
 // Notification handler for new games
 exports.sendGameNotification = functions.firestore
   .document('games/{gameId}')
@@ -40,44 +105,13 @@ exports.sendGameNotification = functions.firestore
       
       console.log(`Sending notifications to ${tokens.length} users:`, userIds);
       
-      // Create the notification message
-      const message = {
-        notification: {
-          title: 'New Game Available!',
-          body: `${game.location} - ${game.date} at ${game.time}`
-        },
-        data: {
-          gameId,
-          url: `/games/${gameId}`,
-          type: 'newGame'
-        },
-        webpush: {
-          notification: {
-            icon: '/logo192.png',
-            badge: '/logo192.png',
-            vibrate: [200, 100, 200],
-            requireInteraction: true,
-            actions: [
-              {
-                action: 'open',
-                title: 'View Game'
-              },
-              {
-                action: 'close',
-                title: 'Dismiss'
-              }
-            ]
-          },
-          fcmOptions: {
-            link: `https://eppspadelbot.vercel.app/games/${gameId}`
-          }
-        },
-        tokens // Send to multiple devices
-      };
-
-      // Send the notification
-      const response = await admin.messaging().sendMulticast(message);
-      console.log('Notification sent successfully:', response);
+      // Send push notification to all users who opted in for game_created
+      await sendEventPushNotification({
+        eventType: 'game_created',
+        title: 'New Game Available!',
+        body: `${game.location} - ${game.date} at ${game.time}`,
+        data: { gameId, url: `/games/${gameId}` }
+      });
 
       // Handle failed tokens
       if (response.failureCount > 0) {
@@ -183,6 +217,56 @@ exports.sendGameNotification = functions.firestore
       return null;
     }
   });
+
+// Example: Game Closed event handler (call this where you handle game closing)
+// async function onGameClosed(game) {
+//   await sendEventPushNotification({
+//     eventType: 'gameClosed',
+//     title: 'Game Closed',
+//     body: `The game at ${game.location} on ${game.date} is now closed. See you on the court!`,
+//     data: { gameId: game.id, url: `/games/${game.id}` },
+//     userIdsOverride: game.players // Only send to participants
+//   });
+// }
+
+/**
+ * Callable function to test all notification events at once for admin/dev.
+ * Sends a test notification for every event type to users who have opted in for each.
+ */
+exports.testAllEventNotifications = functions.https.onCall(async (data, context) => {
+  // Only allow admin users to run this
+  const userSnapshot = await admin.firestore().collection('users').doc(context.auth.uid).get();
+  if (!userSnapshot.exists || userSnapshot.data().role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Only admins can test notifications.');
+  }
+
+  const testEvents = [
+    // Game events
+    { eventType: 'game_created', title: 'Test: Game Created', body: 'A new game has been created (test).' },
+    { eventType: 'game_updated', title: 'Test: Game Updated', body: 'A game has been updated (test).' },
+    { eventType: 'gameClosingSoon', title: 'Test: Game Closing Soon', body: 'A game is closing soon (test).' },
+    { eventType: 'gameClosed', title: 'Test: Game Closed', body: 'A game has been closed (test).' },
+    // Tournament events
+    { eventType: 'tournament_created', title: 'Test: Tournament Created', body: 'A new tournament has been created (test).' },
+    { eventType: 'tournament_deadline', title: 'Test: Tournament Deadline', body: 'A tournament registration deadline is approaching (test).' },
+    { eventType: 'match_result', title: 'Test: Match Result', body: 'A match result has been posted (test).' },
+    { eventType: 'tournament_winner', title: 'Test: Tournament Winner', body: 'A tournament winner has been announced (test).' },
+    { eventType: 'bracket_update', title: 'Test: Bracket Update', body: 'A tournament bracket has been updated (test).' },
+    { eventType: 'upcoming_match', title: 'Test: Upcoming Match', body: 'A match is coming up soon (test).' },
+    // General
+    { eventType: 'general', title: 'Test: General Notification', body: 'This is a general test notification.' }
+  ];
+
+  for (const evt of testEvents) {
+    await sendEventPushNotification({
+      eventType: evt.eventType,
+      title: evt.title,
+      body: evt.body,
+      data: { test: 'true' }
+    });
+  }
+  return { success: true, message: 'Test notifications sent for all event types.' };
+});
 
 // Function to send direct notification to specific users
 exports.sendDirectNotification = functions.https.onCall(async (data, context) => {

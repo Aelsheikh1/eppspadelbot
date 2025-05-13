@@ -19,84 +19,39 @@ export const sendCustomNotification = async (options) => {
       };
     }
     
-    // Create notification document in Firestore
-    const notificationData = {
-      title: title || 'New Notification',
-      body: body || 'You have a new notification',
-      senderId: user.uid,
-      senderEmail: user.email,
-      createdAt: new Date().toISOString(),
-      delivered: false,
-      data: {
-        gameId: gameId || null,
-        url: url || '/games',
-        timestamp: Date.now()
-      }
-    };
-    
-    // Add targeting information if provided
+    // Use Firebase Functions to send notification via FCM
+    const { getFunctions, httpsCallable } = await import('firebase/functions');
+    const functions = getFunctions();
+
+    // Choose the correct function: direct or all
+    let callableFn;
+    let payload;
     if (targetUserId) {
-      notificationData.targetUserId = targetUserId;
-    }
-    
-    if (targetRole) {
-      notificationData.targetRole = targetRole;
-    }
-    
-    // Store in custom notifications collection
-    const notificationRef = await addDoc(collection(db, 'customNotifications'), notificationData);
-    
-    // Get tokens for targeted users
-    let tokens = [];
-    
-    if (targetUserId) {
-      // Get tokens for specific user
-      const tokensQuery = query(collection(db, 'fcmTokens'), where('userId', '==', targetUserId));
-      const tokensSnapshot = await getDocs(tokensQuery);
-      
-      tokensSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.token) {
-          tokens.push(data.token);
-        }
-      });
-    } else if (targetRole) {
-      // Get tokens for users with specific role
-      const tokensQuery = query(collection(db, 'fcmTokens'), where('userRole', '==', targetRole));
-      const tokensSnapshot = await getDocs(tokensQuery);
-      
-      tokensSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.token) {
-          tokens.push(data.token);
-        }
-      });
+      callableFn = httpsCallable(functions, 'sendDirectNotification');
+      payload = {
+        title,
+        body,
+        tokens: [targetUserId], // You may need to resolve userId to tokens in backend
+        gameId,
+        notificationType: targetRole || 'user',
+        url,
+      };
     } else {
-      // Get all tokens
-      const tokensSnapshot = await getDocs(collection(db, 'fcmTokens'));
-      
-      tokensSnapshot.forEach(doc => {
-        const data = doc.data();
-        if (data.token) {
-          tokens.push(data.token);
-        }
-      });
+      callableFn = httpsCallable(functions, 'sendNotificationToAll');
+      payload = {
+        title,
+        body,
+        gameId,
+        notificationType: targetRole || 'announcement',
+        url,
+      };
     }
-    
-    // Now trigger the notification by updating the document
-    // This will be picked up by our custom listener
-    await addDoc(collection(db, 'notificationTriggers'), {
-      notificationId: notificationRef.id,
-      tokens: tokens,
-      createdAt: new Date().toISOString(),
-      processed: false
-    });
-    
+    const result = await callableFn(payload);
     return {
-      success: true,
-      notificationId: notificationRef.id,
-      tokenCount: tokens.length,
-      message: `Notification sent to ${tokens.length} devices`
+      success: result.data.success,
+      notificationId: result.data.notificationId || null,
+      tokenCount: result.data.successCount || 0,
+      message: result.data.message || 'Notification sent via FCM',
     };
   } catch (error) {
     console.error('Error sending custom notification:', error);
